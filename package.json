@@ -1,0 +1,9 @@
+{
+  "name": "life-inf",
+  "version": "0.0.1",
+  "dependencies": {
+    "fast-printf": "^1.6.9",
+    "browserify": "^17.0.0",
+    "light-server": "^2.9.1"
+  }
+}
