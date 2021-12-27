@@ -309,7 +309,7 @@ void read_region_box(struct Box * w, int plane, char * target, int x0, int y0, i
     if (w->x0 >= x0 + sX || w->y0 >= y0 + sY || w->x0 + w->size <= x0 || w->y0 + w->size <= y0)
         return;
 
-    printf("=> [%d] %d, %d\n", w->level, w->x0, w->y0);
+//    printf("=> [%d] %d, %d\n", w->level, w->x0, w->y0);
 
     if (w->level > 0) {
 //        if (w->x0 + N <= x0 || w->y0 + N <= y0)
@@ -332,7 +332,7 @@ void read_region_box(struct Box * w, int plane, char * target, int x0, int y0, i
         int xe = min(N0, x0 - w->x0 + sX);
         int ye = min(N0, y0 - w->y0 + sY);
 
-        printf("xs = %d, ys = %d, xe = %d, ye = %d\n", xs, ys, xe, ye);
+//        printf("xs = %d, ys = %d, xe = %d, ye = %d\n", xs, ys, xe, ye);
 
         assert(0 <= xs && xs < N0);
         assert(0 <= ys && ys < N0);
@@ -344,12 +344,12 @@ void read_region_box(struct Box * w, int plane, char * target, int x0, int y0, i
         for (int y = ys; y < ye; y ++) {
             int tx = w->x0 + xs - x0;
             int ty = w->y0 + y - y0;
-            printf("y = %d, tx = %d, ty = %d\n", y, tx, ty);
+//            printf("y = %d, tx = %d, ty = %d\n", y, tx, ty);
 
             assert(0 <= tx && tx < sX);
             assert(0 <= ty && ty < sY);
 
-            printf("Copying %d bytes to %d\n", xe - xs, sX * ty + tx);
+//            printf("Copying %d bytes to %d\n", xe - xs, sX * ty + tx);
             memcpy(target + (sX * ty + tx), w0->cells0 + N0*N0*plane + y*N0 + xs, xe - xs);
         }
 #undef w0
@@ -357,7 +357,7 @@ void read_region_box(struct Box * w, int plane, char * target, int x0, int y0, i
 }
 
 extern char * read_region(int plane, int x0, int y0, int sX, int sY) {
-    printf("read_region(plane=%d, x0=%d, y0=%d, sX=%d, sY=%d\n", plane, x0, y0, sX, sY);
+//    printf("read_region(plane=%d, x0=%d, y0=%d, sX=%d, sY=%d)\n", plane, x0, y0, sX, sY);
 
     if (sX * sY > RESERVED_REGION) {
         printf("Asked for %d cells, over the limit %d\n", sX * sY, RESERVED_REGION);
