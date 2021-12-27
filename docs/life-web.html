@@ -5,6 +5,7 @@
     <link rel="shortcut icon" href="Icon.png" type="image/x-icon">
     <link rel="icon" href="Icon.png" type="image/x-icon">
     <title>Game of Life</title>
+	<meta content="initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no" name="viewport">
 	<style type="text/css">
 td#controls > * {
 	display: block;
@@ -13,7 +14,10 @@ td#controls > * {
 td#controls > span {
 	font-style: italic;
 }
-	</style>
+canvas {
+	touch-action:none;
+}
+</style>
 </head>
 <body>
 <table style="width: 100%;">

@@ -1,11 +1,11 @@
+const assert = require("assert");
 const {read_i32} = require('../external/wasm-printf');
 
 const RESERVED_REGION = 10000;
 
 function init (elm_map, elm_ovw, life_api, linear_memory) {
-  const envelope = life_api.find_envelope(0);
-  const [xmin, xmax, ymin, ymax] = [...Array(4).keys()].map(i => read_i32(linear_memory, envelope + 4*i));
-  console.log("envelope =", xmin, xmax, ymin, ymax);
+  const env = get_envelope(life_api, linear_memory);
+  console.log("envelope =", env);
 
   const ovw = {ctx: elm_ovw.getContext("2d"), W: elm_ovw.clientWidth, H: elm_ovw.clientHeight,
     scale: {x: elm_ovw.width/elm_ovw.clientWidth, y: elm_ovw.height/elm_ovw.clientHeight}
@@ -22,8 +22,8 @@ function init (elm_map, elm_ovw, life_api, linear_memory) {
   map.scale = {x: elm_map.width/elm_map.clientWidth, y: elm_map.height/elm_map.clientHeight};
 
   map.vp = {cell: 10};
-  map.vp.x0 = (xmin + xmax)/2 - map.W/map.vp.cell/2;
-  map.vp.y0 = (ymin + ymax)/2 - map.H/map.vp.cell/2;
+  map.vp.x0 = (env.x0 + env.x1)/2 - map.W/map.vp.cell/2;
+  map.vp.y0 = (env.y0 + env.y1)/2 - map.H/map.vp.cell/2;
 
   console.log("Viewport: ", map.vp);
 
@@ -39,20 +39,9 @@ function init (elm_map, elm_ovw, life_api, linear_memory) {
   console.log("MAP:", map.W, map.H, elm_map.width, elm_map.height);
   console.log("OVW:", ovw.W, ovw.H, elm_ovw.width, elm_ovw.height);
 
-  update_map (life_api, linear_memory, map);
+  update_map (life_api, linear_memory, map, env);
 
   // credit: https://codepen.io/AbramPlus/pen/mdymKom
-  const pointerEvents = evt => {
-    if (evt.type.startsWith("touch")) {
-      let touch = evt.touches[0] || evt.changedTouches[0];
-      return {x: touch.pageX, y : touch.pageY};
-    }
-    else if (evt.type.startsWith("mouse"))
-      return {x: evt.pageX, y: evt.pageY};
-    else
-      return {x: 0, y :0};
-  };
-
   let ready_to_drag = false;
   let is_dragging = false;
   let is_zooming = false;
@@ -72,7 +61,7 @@ function init (elm_map, elm_ovw, life_api, linear_memory) {
     map.vp.x0 = dragStartOffset.x - move.x / map.vp.cell;
     map.vp.y0 = dragStartOffset.y - move.y / map.vp.cell;
 
-    update_map (life_api, linear_memory, map);
+    update_map (life_api, linear_memory, map, env);
   };
 
   const scaleCanvasTouch = () => {
@@ -80,15 +69,15 @@ function init (elm_map, elm_ovw, life_api, linear_memory) {
   };
 
   const dragZoom = evt => {
-    const is_touch = evt.type.startsWith("touch");
     const rect = elm_map.getBoundingClientRect();
     const map_top = rect.top + window.scrollY;
     const map_left = rect.left + window.scrollX;
 
-    if (evt.type === "mousedown" || evt.type === "touchstart") {
-      let position = pointerEvents(evt);
-      let touch = evt.touches || evt.changedTouches;
+    const is_touch = evt.type.startsWith("touch");
+    const touch = evt.touches || evt.changedTouches;
+    const pos = is_touch? {x: touch[0].pageX, y : touch[0].pageY} : {x: evt.pageX, y: evt.pageY};
 
+    if (evt.type === "mousedown" || evt.type === "touchstart") {
       if (is_touch && touch.length === 2) {
         is_zooming = true;
 
@@ -104,8 +93,8 @@ function init (elm_map, elm_ovw, life_api, linear_memory) {
         ready_to_drag = true;
         is_dragging = is_zooming = false;
 
-        startCoords.x = position.x - map_left/* - last.x*/;
-        startCoords.y = position.y - map_top/* - last.y*/;
+        startCoords.x = pos.x - map_left/* - last.x*/;
+        startCoords.y = pos.y - map_top/* - last.y*/;
 
         dragStartOffset.x = map.vp.x0;
         dragStartOffset.y = map.vp.y0;
@@ -121,11 +110,10 @@ function init (elm_map, elm_ovw, life_api, linear_memory) {
       is_dragging = true;
 
       if (ready_to_drag && !is_zooming) {
-        let position = pointerEvents(evt);
         let offset = is_touch ? 1.3 : 1;
 
-        move.x = (position.x - map_left - startCoords.x) * offset;
-        move.y = (position.y - map_top - startCoords.y) * offset;
+        move.x = (pos.x - map_left - startCoords.x) * offset;
+        move.y = (pos.y - map_top - startCoords.y) * offset;
 
         redraw = window.requestAnimationFrame(canvasDraw);
       }
@@ -144,13 +132,11 @@ function init (elm_map, elm_ovw, life_api, linear_memory) {
       }
     }
 
-    else {
-      const position = pointerEvents(evt);
-
+    else { // "mouseup", "touchend"
       ready_to_drag = is_dragging = is_zooming = false;
 
-      last.x = position.x - map_left - startCoords.x;
-      last.y = position.y - map_top - startCoords.y;
+      last.x = pos.x - map_left - startCoords.x;
+      last.y = pos.y - map_top - startCoords.y;
 
       console.log("[end] last =", last);
 
@@ -159,36 +145,91 @@ function init (elm_map, elm_ovw, life_api, linear_memory) {
     }
   };
 
+/*
   ["mousedown", "touchstart", "mousemove", "touchmove", "mouseup", "touchend"].forEach(x =>
     elm_map.addEventListener(x, dragZoom));
+*/
 
+  const pointerDragZoom = evt => {
+    evt.preventDefault();
+    console.log("Pointer:", evt.type);
+  };
+
+  const wheelZoom = evt => {
+    // https://kenneth.io/post/detecting-multi-touch-trackpad-gestures-in-javascript
+    evt.preventDefault();
+    if (evt.ctrlKey) {
+      const rect = elm_map.getBoundingClientRect();
+      const map_top = rect.top + window.scrollY;
+      const map_left = rect.left + window.scrollX;
+
+      const dx = (evt.clientX - map_left)/map.vp.cell;
+      const dy = (evt.clientY - map_top)/map.vp.cell;
+      const x = map.vp.x0 + dx;
+      const y = map.vp.y0 + dy;
+
+      const k = 1 - evt.deltaY * 0.01;
+      map.vp.cell *= k;
+      map.vp.x0 = x - dx/k;
+      map.vp.y0 = y - dy/k;
+
+      update_map (life_api, linear_memory, map, env);
+    }
+    else {
+      // With with type of drag, mouse pointer stays still; not sure why there is coefficient "2"
+      map.vp.x0 += 2 * evt.deltaX / map.vp.cell;
+      map.vp.y0 += 2 * evt.deltaY / map.vp.cell;
+
+      update_map (life_api, linear_memory, map, env);
+    }
+  }
+
+  ["pointerdown", "pointermove", "pointerup", "pointercancel", "pointerout", "pointerleave"].forEach(x =>
+    elm_map.addEventListener(x, pointerDragZoom));
+
+  elm_map.addEventListener("mousewheel", wheelZoom);
 }
 
-function update_map (life_api, linear_memory, map) {
+function get_envelope(life_api, linear_memory) {
+  const envelope = life_api.find_envelope(0);
+  const [x0, x1, y0, y1] = [...Array(4).keys()].map(i => read_i32(linear_memory, envelope + 4*i));
+  return {x0: x0, x1: x1, y0: y0, y1: y1};
+}
+
+function update_map (life_api, linear_memory, map, env) {
   const x1 = map.vp.x0 + map.W/map.vp.cell;
   const y1 = map.vp.y0 + map.H/map.vp.cell;
 
-  console.log("Region: ", map.vp.x0, x1, map.vp.y0, y1);
-  const [ix0, ix1, iy0, iy1] = [Math.floor(map.vp.x0), Math.ceil(x1), Math.floor(map.vp.y0), Math.ceil(y1)];
+  // console.log("Region: ", map.vp.x0, x1, map.vp.y0, y1);
+  const [ix0, ix1, iy0, iy1] = [Math.max(env.x0, Math.floor(map.vp.x0)), Math.min(env.x1, Math.ceil(x1)),
+                                Math.max(env.y0, Math.floor(map.vp.y0)), Math.min(env.y1, Math.ceil(y1))];
 
   // console.log("Integer region:", ix0, ix1, iy0, iy1);
   const [X, Y] = [ix1 - ix0 + 1, iy1 - iy0 + 1];
   const nCols = Math.min(X, Math.floor(RESERVED_REGION/Y));
-  // console.log("Size:", X, Y, "; read_region:", nCols, "columns");
+  assert(nCols > 0);
 
   map.ctx.fillStyle = 'white';
   map.ctx.fillRect(0, 0, map.W * map.scale.x, map.H * map.scale.y);
-
-  const region = life_api.read_region(0, ix0, iy0, X, Y);
-
   map.ctx.fillStyle = 'grey';
-  for (let y = 0; y < Y; y ++)
-    for (let x = 0; x < X; x ++)
-      if (1 === linear_memory[region + y*X + x]) {
-        const xs = (ix0 + x - map.vp.x0) * map.vp.cell;
-        const ys = (iy0 + y - map.vp.y0) * map.vp.cell;
-        map.ctx.fillRect(xs * map.scale.x, ys * map.scale.y, map.vp.cell * map.scale.x,map.vp.cell * map.scale.y);
-      }
+
+  for(let iBand = 0; nCols * iBand < X; iBand ++) {
+    const xb0 = iBand * nCols;
+    const Xb = Math.min(X, xb0 + nCols) - xb0;
+
+    assert(Xb <= nCols);
+
+    // console.log("Read region", ix0 + xb0, iy0, Xb, Y);
+    const region = life_api.read_region(0, ix0 + xb0, iy0, Xb, Y);
+
+    for (let y = 0; y < Y; y ++)
+      for (let x = 0; x < Xb; x ++)
+        if (1 === linear_memory[region + y*Xb + x]) {
+          const xs = (ix0 + xb0 + x - map.vp.x0) * map.vp.cell;
+          const ys = (iy0 +       y - map.vp.y0) * map.vp.cell;
+          map.ctx.fillRect(xs * map.scale.x, ys * map.scale.y, map.vp.cell * map.scale.x,map.vp.cell * map.scale.y);
+        }
+  }
 }
 
 module.exports = {
