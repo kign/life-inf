@@ -3,23 +3,41 @@ const {read_i32} = require('../external/wasm-printf');
 
 const RESERVED_REGION = 10000;
 
+function Canvas(elm, density) {
+  this.ctx = elm.getContext("2d");
+  this.W = elm.clientWidth;
+  this.H = elm.clientHeight;
+  elm.width = this.W * density;
+  elm.height = this.H * density;
+  this.scale = {x: elm.width/elm.clientWidth, y: elm.height/elm.clientHeight};
+}
+
+Canvas.prototype.fillRect = function(x, y, w, h) {
+  this.ctx.fillRect(x*this.scale.x, y*this.scale.y, w*this.scale.x, h*this.scale.y);
+}
+
+Canvas.prototype.strokeRect = function(x, y, w, h) {
+  this.ctx.fillRect(x*this.scale.x, y*this.scale.y, w*this.scale.x, h*this.scale.y);
+}
+
 function init (elm_map, elm_ovw, life_api, linear_memory) {
   const env = get_envelope(life_api, linear_memory);
   console.log("envelope =", env);
 
-  const ovw = {ctx: elm_ovw.getContext("2d"), W: elm_ovw.clientWidth, H: elm_ovw.clientHeight,
-    scale: {x: elm_ovw.width/elm_ovw.clientWidth, y: elm_ovw.height/elm_ovw.clientHeight}
-  };
+/*
+  const ovw = {ctx: elm_ovw.getContext("2d"), W: elm_ovw.clientWidth, H: elm_ovw.clientHeight};
+  elm_ovw.width = ovw.W * 2;
+  elm_ovw.height = ovw.H * 2;
+  ovw.scale = {x: elm_ovw.width/elm_ovw.clientWidth, y: elm_ovw.height/elm_ovw.clientHeight};
 
-  // const map = {ctx: elm_map.getContext("2d"), W: elm_map.clientWidth, H: elm_map.clientHeight,
-  //   scale: {x: elm_map.width/elm_map.clientWidth, y: elm_map.height/elm_map.clientHeight}
-  // };
   const map = {ctx: elm_map.getContext("2d"), W: elm_map.clientWidth, H: elm_map.clientHeight};
-
   elm_map.width = map.W / 2;
   elm_map.height = map.H / 2;
-
   map.scale = {x: elm_map.width/elm_map.clientWidth, y: elm_map.height/elm_map.clientHeight};
+*/
+
+  const ovw = new Canvas(elm_ovw, 2);
+  const map = new Canvas(elm_map, 0.5);
 
   map.vp = {cell: 10};
   map.vp.x0 = (env.x0 + env.x1)/2 - map.W/map.vp.cell/2;
@@ -27,6 +45,7 @@ function init (elm_map, elm_ovw, life_api, linear_memory) {
 
   console.log("Viewport: ", map.vp);
 
+/*
   ovw.ctx.fillStyle = '#80FFFF';
   ovw.ctx.fillRect(0, 0, ovw.W * ovw.scale.x/2, ovw.H * ovw.scale.y/2);
   ovw.ctx.fillStyle = '#FF80FF';
@@ -35,11 +54,12 @@ function init (elm_map, elm_ovw, life_api, linear_memory) {
   ovw.ctx.fillRect(0, ovw.H * ovw.scale.y/2,ovw.W * ovw.scale.x/2, ovw.H * ovw.scale.y/2);
   ovw.ctx.fillStyle = '#8080FF';
   ovw.ctx.fillRect(ovw.W * ovw.scale.x/2, ovw.H * ovw.scale.y/2, ovw.W * ovw.scale.x/2, ovw.H * ovw.scale.y/2);
+*/
 
   console.log("MAP:", map.W, map.H, elm_map.width, elm_map.height);
   console.log("OVW:", ovw.W, ovw.H, elm_ovw.width, elm_ovw.height);
 
-  update_map (life_api, linear_memory, map, env);
+  update_map (life_api, linear_memory, map, ovw, env);
 
   // credit: https://codepen.io/AbramPlus/pen/mdymKom
   let ready_to_drag = false;
@@ -61,7 +81,7 @@ function init (elm_map, elm_ovw, life_api, linear_memory) {
     map.vp.x0 = dragStartOffset.x - move.x / map.vp.cell;
     map.vp.y0 = dragStartOffset.y - move.y / map.vp.cell;
 
-    update_map (life_api, linear_memory, map, env);
+    update_map (life_api, linear_memory, map, ovw, env);
   };
 
   const scaleCanvasTouch = () => {
@@ -173,14 +193,14 @@ function init (elm_map, elm_ovw, life_api, linear_memory) {
       map.vp.x0 = x - dx/k;
       map.vp.y0 = y - dy/k;
 
-      update_map (life_api, linear_memory, map, env);
+      update_map (life_api, linear_memory, map, ovw, env);
     }
     else {
       // With with type of drag, mouse pointer stays still; not sure why there is coefficient "2"
       map.vp.x0 += 2 * evt.deltaX / map.vp.cell;
       map.vp.y0 += 2 * evt.deltaY / map.vp.cell;
 
-      update_map (life_api, linear_memory, map, env);
+      update_map (life_api, linear_memory, map, ovw, env);
     }
   }
 
@@ -196,13 +216,37 @@ function get_envelope(life_api, linear_memory) {
   return {x0: x0, x1: x1, y0: y0, y1: y1};
 }
 
-function update_map (life_api, linear_memory, map, env) {
-  const x1 = map.vp.x0 + map.W/map.vp.cell;
-  const y1 = map.vp.y0 + map.H/map.vp.cell;
+function update_ovw(ovw, env, win) {
+  const cols = {bg: '#E0E0E0',
+                env: '#A0E0A0',
+                win: 'white'};
+
+  ovw.ctx.fillStyle = cols.bg;
+  ovw.fillRect(0, 0, ovw.W, ovw.H);
+
+  const eps = 0.1;
+
+  const full = {x0: Math.min(env.x0, win.x0), x1: Math.max(env.x1, win.x1),
+                y0: Math.min(env.y0, win.y0), y1: Math.max(env.y1, win.y1)};
+  const ext = {x0: full.x0 - eps * (full.x1 - full.x0), x1: full.x1 + eps * (full.x1 - full.x0),
+               y0: full.y0 - eps * (full.y1 - full.y0), y1: full.y1 + eps * (full.y1 - full.y0)};
+  const scale = Math.min(ovw.W / (ext.x1 - ext.x0), ovw.H / (ext.y1 - ext.y0));
+
+  ovw.ctx.fillStyle = cols.env;
+  ovw.fillRect((env.x0 - ext.x0)*scale, (env.y0 - ext.y0)*scale, (env.x1 - env.x0)*scale, (env.y1 - env.y0)*scale);
+
+  ovw.ctx.fillStyle = cols.win;
+  ovw.fillRect((win.x0 - ext.x0)*scale, (win.y0 - ext.y0)*scale, (win.x1 - win.x0)*scale, (win.y1 - win.y0)*scale);
+}
+
+function update_map (life_api, linear_memory, map, ovw, env) {
+  const win = {x0: map.vp.x0, x1: map.vp.x0 + map.W/map.vp.cell, y0: map.vp.y0, y1: map.vp.y0 + map.H/map.vp.cell};
+
+  update_ovw(ovw, env, win);
 
   // console.log("Region: ", map.vp.x0, x1, map.vp.y0, y1);
-  const [ix0, ix1, iy0, iy1] = [Math.max(env.x0, Math.floor(map.vp.x0)), Math.min(env.x1, Math.ceil(x1)),
-                                Math.max(env.y0, Math.floor(map.vp.y0)), Math.min(env.y1, Math.ceil(y1))];
+  const [ix0, ix1, iy0, iy1] = [Math.max(env.x0, Math.floor(win.x0)), Math.min(env.x1, Math.ceil(win.x1)),
+                                Math.max(env.y0, Math.floor(win.y0)), Math.min(env.y1, Math.ceil(win.y1))];
 
   // console.log("Integer region:", ix0, ix1, iy0, iy1);
   const [X, Y] = [ix1 - ix0 + 1, iy1 - iy0 + 1];
