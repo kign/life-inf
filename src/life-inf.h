@@ -31,10 +31,12 @@ extern int get_cell(int x, int y, int plane);
 extern void release_box(struct Box * box);
 extern void set_cell(int x, int y, int val, int plane, int age);
 extern void read_from_region(int x0, int y0, int sX, int sY, char * src);
+extern int get_active_plane();
+extern void set_active_plane(int new_active_plane);
 
 // life-inf.c
 extern void life_prepare (struct Stat * stat);
-extern void life_step (int dst, int age, struct Stat * stat);
+extern void life_step (int age, struct Stat * stat);
 
 #ifndef C4WA
 #define min(a,b) ((a) < (b))?(a):(b)

@@ -8,17 +8,18 @@
 const unsigned int rand_x = 179424673;
 const unsigned int rand_y = 376424971;
 
-void life_prepare_box(struct Box * w, struct Stat * stat) {
+void life_prepare_box(struct Box * w, int plane, struct Stat * stat) {
     if (w->level > 0) {
         for(int idx = 0; idx < N*N; idx ++)
             if (w->cells[idx])
-                life_prepare_box(w->cells[idx], stat);
+                life_prepare_box(w->cells[idx], plane, stat);
     }
     else {
+#define w0 ((struct Box0 *)w)
         unsigned int hash = 0;
         int cnt = 0;
-        for(int idx = 0; idx < N0*N0; idx ++)
-            if (((struct Box0 *)w)->cells0[idx] == 1) {
+        for(int idx = plane*(N0*N0); idx < (plane+1)*(N0*N0); idx ++)
+            if (w0->cells0[idx] == 1) {
                 int y = idx / N0;
                 int x = idx % N0;
 
@@ -31,16 +32,17 @@ void life_prepare_box(struct Box * w, struct Stat * stat) {
                     int vy = y + j / 3 - 1;
                     if (0 <= vx && vx < N0 && 0 <= vy && vy < N0) {
                         int ind = vy * N0 + vx;
-                        if (0 == ((struct Box0 *)w)->cells0[ind])
-                            ((struct Box0 *)w)->cells0[ind] = 2;
+                        if (0 == w0->cells0[ind])
+                            w0->cells0[ind] = 2;
                     }
                     else
-                        if (0 == get_cell(vx + w->x0, vy + w->y0, 0))
-                            set_cell(vx + w->x0, vy + w->y0, 2, 0, 0);
+                        if (0 == get_cell(vx + w->x0, vy + w->y0, plane))
+                            set_cell(vx + w->x0, vy + w->y0, 2, plane, 0);
                 }
             }
         stat->hash ^= hash;
         stat->count += cnt;
+#undef w0
     }
 }
 
@@ -126,11 +128,12 @@ void life_prepare (struct Stat * stat) {
     if (world) {
         stat->count = 0;
         stat->hash = 0;
-        life_prepare_box(world, stat);
+        life_prepare_box(world, get_active_plane(), stat);
     }
 }
 
-void life_step (int dst, int age, struct Stat * stat) {
+void life_step (int age, struct Stat * stat) {
+    int dst = 1 - get_active_plane();
     struct Box * world = get_world ();
 
     if (world) {
@@ -139,4 +142,6 @@ void life_step (int dst, int age, struct Stat * stat) {
         life_clean_plane(world, dst);
         life_step_box(world, dst, age, stat);
     }
+
+    set_active_plane(dst);
 }

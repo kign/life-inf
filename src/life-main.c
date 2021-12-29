@@ -27,8 +27,7 @@ extern void init () {
     unsigned int hash[4];
     hash[3] = stat_i.hash;
     for (iter = 0; iter < 1000; iter ++) {
-        int i = iter % 2;
-        life_step(1 - i, iter + 1, &stat_i);
+        life_step(iter + 1, &stat_i);
         int j;
         for(j = 0; j < 4 && hash[j] != stat_i.hash; j ++);
         if (j < 4) {

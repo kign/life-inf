@@ -15,6 +15,16 @@ struct Box * get_world() {
     return world;
 }
 
+static int active_plane = 0;
+
+int get_active_plane() {
+    return active_plane;
+}
+
+void set_active_plane(int new_active_plane) {
+    active_plane = new_active_plane;
+}
+
 struct Box * alloc_new_box (int level, int x0, int y0) {
     mm_allocated ++;
     struct Box * box = (struct Box *) malloc(level == 0? sizeof(struct Box0): sizeof(struct Box));
@@ -293,14 +303,14 @@ void find_envelope_box(struct Box * w, int plane, int * xmin, int * xmax, int * 
     }
 }
 
-extern int * find_envelope(int plane) {
+extern int * find_envelope() {
     int env[4];
     int * ret = env;
     env[0] = 1<<30;
     env[1] = -(2<<30);
     env[2] = env[0];
     env[3] = env[1];
-    find_envelope_box(world, plane, env, env+1, env+2, env+3);
+    find_envelope_box(world, active_plane, env, env+1, env+2, env+3);
     printf("Envelope: X[%d, %d], Y[%d, %d]\n", env[0], env[1], env[2], env[3]);
     return ret;
 }
@@ -356,7 +366,7 @@ void read_region_box(struct Box * w, int plane, char * target, int x0, int y0, i
     }
 }
 
-extern char * read_region(int plane, int x0, int y0, int sX, int sY) {
+extern char * read_region(int x0, int y0, int sX, int sY) {
 //    printf("read_region(plane=%d, x0=%d, y0=%d, sX=%d, sY=%d)\n", plane, x0, y0, sX, sY);
 
     if (sX * sY > RESERVED_REGION) {
@@ -371,7 +381,12 @@ extern char * read_region(int plane, int x0, int y0, int sX, int sY) {
 
     memset(target, '\0', sX * sY);
     if (world)
-        read_region_box(world, plane, target, x0, y0, sX, sY);
+        read_region_box(world, active_plane, target, x0, y0, sX, sY);
 
     return target;
+}
+
+extern void life_set_cell(int x, int y, int val) {
+    assert(val == 0 || val == 1);
+    set_cell(x, y, val, active_plane, 0);
 }
