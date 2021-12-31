@@ -29,7 +29,7 @@ Canvas.prototype.strokeRect = function(x, y, w, h) {
   this.ctx.strokeRect(x*this.scale.x, y*this.scale.y, w*this.scale.x, h*this.scale.y);
 }
 
-function ShiftZoom(elm, cvs, update_fn) {
+function PanZoom(elm, cvs, update_fn) {
   this.elm = elm;
   this.cvs = cvs;
   this.vp = {};
@@ -41,25 +41,24 @@ function ShiftZoom(elm, cvs, update_fn) {
   this.old_y = null;
 }
 
-ShiftZoom.prototype.scroll = function (dx, dy) {
-  this.cvs.vp.x0 += dx;
-  this.cvs.vp.y0 += dy;
+PanZoom.prototype.scroll = function (k, dx, dy) {
+  this.cvs.vp.x0 += k * dx / this.cvs.vp.cell;
+  this.cvs.vp.y0 += k * dy / this.cvs.vp.cell;
 
   this._redraw(this.cvs.vp);
 }
 
-ShiftZoom.prototype.zoom = function (k, x, y) {
-  const dx = x - this.cvs.vp.x0;
-  const dy = y - this.cvs.vp.y0;
-
+PanZoom.prototype.zoom = function (k, x, y) {
+  const d = {x: x / this.cvs.vp.cell, y: y / this.cvs.vp.cell};
+  const o = {x: this.cvs.vp.x0 + d.x, y: this.cvs.vp.y0 + d.y};
   this.cvs.vp.cell *= k;
-  this.cvs.vp.x0 = x - dx/k;
-  this.cvs.vp.y0 = y - dy/k;
+  this.cvs.vp.x0 = o.x - d.x/k;
+  this.cvs.vp.y0 = o.y - d.y/k;
 
   this._redraw(this.cvs.vp);
 }
 
-ShiftZoom.prototype.down = function (id, x, y) {
+PanZoom.prototype.down = function (id, x, y) {
   const idx = this.touches.findIndex(t => t.id === id);
   if (idx >= 0) return;
   if (this.touches.length >= 2)
@@ -77,7 +76,7 @@ ShiftZoom.prototype.down = function (id, x, y) {
   this.vp = {...this.cvs.vp};
 }
 
-ShiftZoom.prototype._adjust_vp = function(a, b) {
+PanZoom.prototype._adjust_vp = function(a, b) {
   if (b) {
     const old_d = (a.x0 - b.x0)**2 + (a.y0 - b.y0)**2;
     const new_d = (a.x - b.x)**2 + (a.y - b.y)**2;
@@ -96,7 +95,7 @@ ShiftZoom.prototype._adjust_vp = function(a, b) {
   }
 }
 
-ShiftZoom.prototype.move = function (id, x, y) {
+PanZoom.prototype.move = function (id, x, y) {
   const idx = this.touches.findIndex(x => x.id === id);
   if (idx < 0) return;
 
@@ -107,7 +106,7 @@ ShiftZoom.prototype.move = function (id, x, y) {
   this._redraw(this.vp);
 }
 
-ShiftZoom.prototype.up = function (id) {
+PanZoom.prototype.up = function (id) {
   const idx = this.touches.findIndex(x => x.id === id);
   if (idx < 0) return;
 
@@ -122,7 +121,7 @@ ShiftZoom.prototype.up = function (id) {
   }
 }
 
-ShiftZoom.prototype._redraw = function (vp) {
+PanZoom.prototype._redraw = function (vp) {
   if (this.old_x && this.old_y) {
     const d = {x: Math.abs(vp.x0 - this.old_x), y: Math.abs(vp.y0 - this.old_y)};
     if (d.x > 2)
@@ -159,179 +158,38 @@ function init (elm_map, elm_ovw, life_api, linear_memory) {
 
   update_map (life_api, linear_memory, map, map.vp, ovw, env);
 
-  // credit: https://codepen.io/AbramPlus/pen/mdymKom
-  let ready_to_drag = false;
-  let is_dragging = false;
-  let is_zooming = false;
-  let lastDistance = 0;
-  let distance = 0;
-  let scaleDraw;
-  let redraw;
-
-  const startCoords = {x: 0, y: 0};
-  const last = {x: 0, y: 0};
-  const move = {x: 0, y: 0};
-
-  let vp_start = {x: 0, y: 0};
-
-  const canvasDraw = () => {
-    // console.log("canvasDraw(", move, ")");
-    map.vp.x0 = vp_start.x - move.x / map.vp.cell;
-    map.vp.y0 = vp_start.y - move.y / map.vp.cell;
-
-    update_map (life_api, linear_memory, map, map.vp, ovw, env);
-  };
-
-  const scaleCanvasTouch = () => {
-    console.log("scaleCanvasTouch()");
-  };
-
-  const dragZoom = evt => {
-    const rect = elm_map.getBoundingClientRect();
-    const map_top = rect.top + window.scrollY;
-    const map_left = rect.left + window.scrollX;
-
-    const is_touch = evt.type.startsWith("touch");
-    const touch = evt.touches || evt.changedTouches;
-    const pos = is_touch? {x: touch[0].pageX, y : touch[0].pageY} : {x: evt.pageX, y: evt.pageY};
-
-    if (evt.type === "mousedown" || evt.type === "touchstart") {
-      if (is_touch && touch.length === 2) {
-        is_zooming = true;
-
-        // Pinch detection credits: http://stackoverflow.com/questions/11183174/simplest-way-to-detect-a-pinch/11183333#11183333
-        lastDistance = Math.sqrt(
-          (touch[0].clientX - touch[1].clientX) *
-          (touch[0].clientX - touch[1].clientX) +
-          (touch[0].clientY - touch[1].clientY) *
-          (touch[0].clientY - touch[1].clientY)
-        );
-      }
-      else {
-        ready_to_drag = true;
-        is_dragging = is_zooming = false;
-
-        startCoords.x = pos.x - map_left/* - last.x*/;
-        startCoords.y = pos.y - map_top/* - last.y*/;
-
-        vp_start.x = map.vp.x0;
-        vp_start.y = map.vp.y0;
-
-        console.log("startCoords =", startCoords);
-        console.log("dragStartOffset =", vp_start);
-      }
-    }
-
-    else if (evt.type === "mousemove" || evt.type === "touchmove") {
-      evt.preventDefault();
-
-      is_dragging = true;
-
-      if (ready_to_drag && !is_zooming) {
-        let offset = is_touch ? 1.3 : 1;
-
-        move.x = (pos.x - map_left - startCoords.x) * offset;
-        move.y = (pos.y - map_top - startCoords.y) * offset;
-
-        redraw = window.requestAnimationFrame(canvasDraw);
-      }
-      else if (is_zooming) {
-        const touch = evt.touches || evt.changedTouches;
-
-        //Pinch detection credits: http://stackoverflow.com/questions/11183174/simplest-way-to-detect-a-pinch/11183333#11183333
-        distance = Math.sqrt(
-          (touch[0].clientX - touch[1].clientX) *
-          (touch[0].clientX - touch[1].clientX) +
-          (touch[0].clientY - touch[1].clientY) *
-          (touch[0].clientY - touch[1].clientY)
-        );
-
-        scaleDraw = window.requestAnimationFrame(scaleCanvasTouch);
-      }
-    }
-
-    else { // "mouseup", "touchend"
-      ready_to_drag = is_dragging = is_zooming = false;
-
-      last.x = pos.x - map_left - startCoords.x;
-      last.y = pos.y - map_top - startCoords.y;
-
-      console.log("[end] last =", last);
-
-      window.cancelAnimationFrame(scaleDraw);
-      window.cancelAnimationFrame(redraw);
-    }
-  };
-
-/*
-  ["mousedown", "touchstart", "mousemove", "touchmove", "mouseup", "touchend"].forEach(x =>
-    elm_map.addEventListener(x, dragZoom));
-*/
-
-  const shiftZoom = new ShiftZoom(elm_map, map,
+  const panZoom = new PanZoom(elm_map, map,
         (cvs, vp) => update_map (life_api, linear_memory, cvs, vp, ovw, env));
 
-  const pointerDragZoom = evt => {
+  // These events support pan with a mouse or pan/pinch zoom with multi-touch
+  const pointerPanZoom = evt => {
     evt.preventDefault();
     const rect = elm_map.getBoundingClientRect();
 
     if (evt.type === "pointerdown")
-      shiftZoom.down(evt.pointerId, evt.clientX - rect.left, evt.clientY - rect.top);
+      panZoom.down(evt.pointerId, evt.clientX - rect.left, evt.clientY - rect.top);
     else if (evt.type === "pointermove")
-      shiftZoom.move(evt.pointerId, evt.clientX - rect.left, evt.clientY - rect.top);
+      panZoom.move(evt.pointerId, evt.clientX - rect.left, evt.clientY - rect.top);
     else
-      shiftZoom.up(evt.pointerId);
+      panZoom.up(evt.pointerId);
   };
 
-  const wheelZoom_TBR = evt => {
-    // https://kenneth.io/post/detecting-multi-touch-trackpad-gestures-in-javascript
-    evt.preventDefault();
-    if (evt.ctrlKey) {
-      const rect = elm_map.getBoundingClientRect();
-
-      const dx = (evt.clientX - rect.left)/map.vp.cell;
-      const dy = (evt.clientY - rect.top)/map.vp.cell;
-      const x = map.vp.x0 + dx;
-      const y = map.vp.y0 + dy;
-
-      const k = 1 - evt.deltaY * 0.01;
-      map.vp.cell *= k;
-      map.vp.x0 = x - dx/k;
-      map.vp.y0 = y - dy/k;
-
-      update_map (life_api, linear_memory, map, map.vp, ovw, env);
-    }
-    else {
-      // With with type of drag, mouse pointer stays still; not sure why there is coefficient "2"
-      map.vp.x0 += 2 * evt.deltaX / map.vp.cell;
-      map.vp.y0 += 2 * evt.deltaY / map.vp.cell;
-
-      update_map (life_api, linear_memory, map, map.vp, ovw, env);
-    }
-  }
-
-  const wheelZoom = evt => {
-    evt.preventDefault();
-
-    if (evt.ctrlKey) {
-      const rect = elm_map.getBoundingClientRect();
-      const x = map.vp.x0 + (evt.clientX - rect.left)/map.vp.cell;
-      const y = map.vp.y0 + (evt.clientY - rect.top)/map.vp.cell;
-
-      shiftZoom.zoom(1 - evt.deltaY * 0.01, x, y);
-    }
-    else {
-      const dx = 2 * evt.deltaX / map.vp.cell;
-      const dy = 2 * evt.deltaY / map.vp.cell;
-
-      shiftZoom.scroll(dx, dy);
-    }
-  }
-
   ["pointerdown", "pointermove", "pointerup", "pointercancel", "pointerout", "pointerleave"].forEach(x =>
-    elm_map.addEventListener(x, pointerDragZoom));
+    elm_map.addEventListener(x, pointerPanZoom));
 
-  elm_map.addEventListener("mousewheel", wheelZoom);
+  // These events support pan/zoom with a mouse wheel or a trackpad
+  const wheelPanZoom = evt => {
+    evt.preventDefault();
+
+    if (evt.ctrlKey) {
+      const rect = elm_map.getBoundingClientRect();
+      panZoom.zoom(1 - evt.deltaY * 0.01, evt.clientX - rect.left, evt.clientY - rect.top);
+    }
+    else
+      panZoom.scroll(2, evt.deltaX, evt.deltaY);
+  }
+
+  elm_map.addEventListener("mousewheel", wheelPanZoom);
 }
 
 function get_envelope(life_api, linear_memory) {
