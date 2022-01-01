@@ -36,9 +36,6 @@ function PanZoom(elm, cvs, update_fn) {
   this.update_fn = update_fn;
   this.touches = [];
   this.ts = 0;
-
-  this.old_x = null;
-  this.old_y = null;
 }
 
 PanZoom.prototype.scroll = function (k, dx, dy) {
@@ -122,15 +119,6 @@ PanZoom.prototype.up = function (id) {
 }
 
 PanZoom.prototype._redraw = function (vp) {
-  if (this.old_x && this.old_y) {
-    const d = {x: Math.abs(vp.x0 - this.old_x), y: Math.abs(vp.y0 - this.old_y)};
-    if (d.x > 2)
-      console.log("big difference X =", d.x);
-    if (d.y > 2)
-      console.log("big difference Y =", d.y);
-  }
-  this.old_x = vp.x0;
-  this.old_y = vp.y0;
   const frozen_vp = {...vp};
   window.requestAnimationFrame(ts => {
     if (ts > this.ts) {
@@ -147,7 +135,7 @@ function init (elm_map, elm_ovw, life_api, linear_memory) {
   const ovw = new Canvas(elm_ovw, 2);
   const map = new Canvas(elm_map, 0.5);
 
-  map.vp = {cell: 10};
+  map.vp = {cell: 0.3};
   map.vp.x0 = (env.x0 + env.x1)/2 - map.W/map.vp.cell/2;
   map.vp.y0 = (env.y0 + env.y1)/2 - map.H/map.vp.cell/2;
 
@@ -190,6 +178,24 @@ function init (elm_map, elm_ovw, life_api, linear_memory) {
   }
 
   elm_map.addEventListener("mousewheel", wheelPanZoom);
+
+  const onClick = evt => {
+    if (map.vp.cell < 5) {
+      window.alert("Zoom in to select cells");
+      return;
+    }
+
+    const rect = elm_map.getBoundingClientRect();
+    const ix = Math.floor(map.vp.x0 + (evt.clientX - rect.left)/map.vp.cell);
+    const iy = Math.floor(map.vp.y0 + (evt.clientY - rect.top) /map.vp.cell);
+
+    const val = life_api.life_get_cell(ix, iy);
+    life_api.life_set_cell(ix, iy, 1 - val);
+    update_map (life_api, linear_memory, map, map.vp, ovw, env);
+  }
+
+  elm_map.addEventListener("click", onClick);
+
 }
 
 function get_envelope(life_api, linear_memory) {
@@ -230,10 +236,12 @@ function update_map (life_api, linear_memory, map, vp, ovw, env) {
                                 Math.max(env.y0, Math.floor(win.y0)), Math.min(env.y1, Math.ceil(win.y1))];
 
   // console.log("Integer region:", ix0, ix1, iy0, iy1);
+  const scale = Math.ceil(1/vp.cell);
   const [X, Y] = [ix1 - ix0 + 1, iy1 - iy0 + 1];
   if (X <= 0 || Y <= 0) return;
 
-  const nCols = Math.min(X, Math.floor(RESERVED_REGION/Y));
+  const Ys = Math.ceil(Y/scale);
+  const nCols = scale * Math.floor(Math.min(X, Math.floor(scale * RESERVED_REGION/Ys)) / scale);
   assert(nCols > 0);
 
   map.ctx.fillStyle = COLORS.map.bg;
@@ -247,15 +255,31 @@ function update_map (life_api, linear_memory, map, vp, ovw, env) {
     assert(Xb <= nCols);
 
     // console.log("Read region", ix0 + xb0, iy0, Xb, Y);
-    const region = life_api.read_region(ix0 + xb0, iy0, Xb, Y);
+    if (scale === 1) {
+      const region = life_api.read_region(ix0 + xb0, iy0, Xb, Y);
 
-    for (let y = 0; y < Y; y ++)
-      for (let x = 0; x < Xb; x ++)
-        if (1 === linear_memory[region + y*Xb + x]) {
-          const xs = (ix0 + xb0 + x - vp.x0) * vp.cell;
-          const ys = (iy0 +       y - vp.y0) * vp.cell;
-          map.ctx.fillRect(xs * map.scale.x, ys * map.scale.y, vp.cell * map.scale.x,vp.cell * map.scale.y);
-        }
+      for (let y = 0; y < Y; y++)
+        for (let x = 0; x < Xb; x++)
+          if (1 === linear_memory[region + y * Xb + x]) {
+            const xs = (ix0 + xb0 + x - vp.x0) * vp.cell;
+            const ys = (iy0 + y - vp.y0) * vp.cell;
+            map.ctx.fillRect(xs * map.scale.x, ys * map.scale.y, vp.cell * map.scale.x, vp.cell * map.scale.y);
+          }
+    }
+    else {
+      const Xs = Math.ceil(Xb/scale);
+      const region = life_api.read_region_scale(ix0 + xb0, iy0, Xs, Ys, scale);
+      for (let y = 0; y < Ys; y++)
+        for (let x = 0; x < Xs; x++)
+          if (linear_memory[region + y * Xs + x] > 0) {
+            const xs = (ix0 + xb0 + x * scale - vp.x0) * vp.cell;
+            const ys = (iy0 + y * scale - vp.y0) * vp.cell;
+            map.ctx.fillRect(xs * map.scale.x, ys * map.scale.y, vp.cell * map.scale.x * scale, vp.cell * map.scale.y * scale);
+          }
+
+
+
+    }
   }
 }
 

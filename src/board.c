@@ -386,7 +386,72 @@ extern char * read_region(int x0, int y0, int sX, int sY) {
     return target;
 }
 
+void read_region_box_scale(struct Box * w, int plane, char * target, int x0, int y0, int sX, int sY, int scale) {
+    if (w->x0 >= x0 + sX*scale || w->y0 >= y0 + sY*scale || w->x0 + w->size <= x0 || w->y0 + w->size <= y0)
+        return;
+
+    if (w->level > 0) {
+        for(int idx = 0; idx < N*N; idx ++)
+            if (w->cells[idx])
+                read_region_box_scale(w->cells[idx], plane, target, x0, y0, sX, sY, scale);
+    }
+    else {
+#define w0 ((struct Box0 *)w)
+        // Note that w->size == N0
+        assert(w->x0 + N0 > x0 && w->y0 + N0 > y0);
+
+        int xs = max(0, x0 - w->x0);
+        int ys = max(0, y0 - w->y0);
+        int xe = min(N0, x0 - w->x0 + sX*scale);
+        int ye = min(N0, y0 - w->y0 + sY*scale);
+
+        assert(0 <= xs && xs < N0);
+        assert(0 <= ys && ys < N0);
+        assert(0 < xe && xe <= N0);
+        assert(0 < ye && ye <= N0);
+        assert(xs < xe);
+        assert(ys < ye);
+
+        for (int y = ys; y < ye; y ++)
+            for(int x = xs; x < xe; x ++)
+                if (w0->cells0[N0*N0*plane + y*N0 + x]) {
+                    int tx = (w->x0 + x - x0)/scale;
+                    int ty = (w->y0 + y - y0)/scale;
+
+                    assert(0 <= tx && tx < sX);
+                    assert(0 <= ty && ty < sY);
+
+                    target[sX * ty + tx] ++;
+            }
+#undef w0
+    }
+}
+
+extern char * read_region_scale(int x0, int y0, int sX, int sY, int scale) {
+    assert(1 <= scale && scale <= 100);
+
+    if (sX * sY > RESERVED_REGION) {
+        printf("Asked for %d cells, over the limit %d\n", sX * sY, RESERVED_REGION);
+        return 0;
+    }
+#ifdef C4WA
+    char * target = __builtin_memory + __builtin_offset;
+#else
+    char * target = malloc(sX * sY);
+#endif
+
+    memset(target, '\0', sX * sY);
+    if (world)
+        read_region_box_scale(world, active_plane, target, x0, y0, sX, sY, scale);
+
+    return target;
+}
+
 extern void life_set_cell(int x, int y, int val) {
     assert(val == 0 || val == 1);
     set_cell(x, y, val, active_plane, 0);
+}
+
+extern int life_get_cell(int x, int y) {
+    return 1 == get_cell(x, y, active_plane);
 }
