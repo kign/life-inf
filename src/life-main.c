@@ -18,27 +18,26 @@ extern void init () {
     const int sY = 5;
     assert(sX * sY == strlen(initial_pos));
 
-    read_from_region(0, 0, sX, sY, initial_pos);
+    set_region(0, 0, sX, sY, initial_pos);
+/*
 
-    struct Stat stat_i;
-    life_prepare(&stat_i);
+    life_prepare();
 
     int iter;
-    unsigned int hash[4];
-    hash[3] = stat_i.hash;
     for (iter = 0; iter < 1000; iter ++) {
-        life_step(iter + 1, &stat_i);
-        int j;
-        for(j = 0; j < 4 && hash[j] != stat_i.hash; j ++);
-        if (j < 4) {
+        const int cycle = life_step();
+
+        if (cycle) {
             printf("Cycle detected at iter = %d\n", iter);
             break;
         }
-        for(j = 0; j < 4; j ++)
-            hash[j] = j < 3? hash[j+1]: stat_i.hash;
     }
+*/
 
-    printf("Successfully completed %d iterations: cnt = %d\n", iter, stat_i.count);
+/*
+    printf("Successfully completed %d iterations: cnt = %d, age = %d, env = %d %d %d %d\n", iter,
+            stat_i.count, get_current_age(), stat_i.xmin, stat_i.xmax, stat_i.ymin, stat_i.ymax);
+*/
 }
 
 #ifndef C4WA

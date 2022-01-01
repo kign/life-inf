@@ -21,7 +21,8 @@ function main () {
     const controls = {
       cvs_map: document.getElementById('map'),
       cvs_ovw: document.getElementById('overview'),
-      sel_mode: document.getElementById('mode')
+      sel_mode: document.getElementById('mode'),
+      bt_step: document.getElementById("bt-step")
     };
 
     display_init(controls, life_api);

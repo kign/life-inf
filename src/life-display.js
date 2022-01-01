@@ -129,13 +129,14 @@ PanZoom.prototype._redraw = function (vp) {
 }
 
 function init (controls, life_api) {
-  const env = get_envelope(life_api);
+  let env = get_envelope(life_api);
   console.log("envelope =", env);
+  let manually_changed = true;
 
   const ovw = new Canvas(controls.cvs_ovw, 2);
   const map = new Canvas(controls.cvs_map, 0.5);
 
-  map.vp = {cell: 0.3};
+  map.vp = {cell: 20};
   map.vp.x0 = (env.x0 + env.x1)/2 - map.W/map.vp.cell/2;
   map.vp.y0 = (env.y0 + env.y1)/2 - map.H/map.vp.cell/2;
 
@@ -191,13 +192,29 @@ function init (controls, life_api) {
     const ix = Math.floor(map.vp.x0 + (evt.clientX - rect.left)/map.vp.cell);
     const iy = Math.floor(map.vp.y0 + (evt.clientY - rect.top) /map.vp.cell);
 
+/*
+    console.log("Click: ", ix, iy);
+    if (controls.sel_mode.value !== "sel")
+      return;
+*/
+
     const val = life_api.life_get_cell(ix, iy);
     life_api.life_set_cell(ix, iy, 1 - val);
+    env = get_envelope(life_api);
     update_map (controls, life_api, map, map.vp, ovw, env);
+    manually_changed = true;
   }
 
   controls.cvs_map.addEventListener("click", onClick);
 
+  controls.bt_step.addEventListener("click", function () {
+    if (manually_changed)
+      life_api.life_prepare ();
+    life_api.life_step();
+    env = get_envelope(life_api);
+    update_map (controls, life_api, map, map.vp, ovw, env);
+    manually_changed = false;
+  });
 }
 
 function get_envelope(life_api) {

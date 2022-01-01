@@ -16,9 +16,22 @@ struct Box * get_world() {
 }
 
 static int active_plane = 0;
+static int env_xmin = 1<<30;
+static int env_xmax = -(1<<30);
+static int env_ymin = 1<<30;
+static int env_ymax = -(1<<30);
+static int current_age = 0;
 
 int get_active_plane() {
     return active_plane;
+}
+
+void increment_age () {
+    current_age ++;
+}
+
+int get_current_age () {
+    return current_age;
 }
 
 void set_active_plane(int new_active_plane) {
@@ -85,7 +98,7 @@ void verify(struct Box * w) {
         }
 }
 
-void set_cell(int x, int y, int val, int plane, int age) {
+void set_cell(int x, int y, int val, int plane) {
     struct Box * w;
     int t, xp, yp;
     const int verbose = 0;
@@ -185,7 +198,7 @@ void set_cell(int x, int y, int val, int plane, int age) {
         if (verbose)
             printf("Entering (%d,%d) into <%d,%d,%d,%d>\n", x, y, w->level, w->x0, w->y0, w->size);
         assert (w->x0 <= x && x < w->x0 + w->size && w->y0 <= y && y < w->y0 + w->size);
-        if (val) w->age = age;
+        if (val) w->age = current_age;
         if (w->level == 0) {
             xp = x - w->x0;
             yp = y - w->y0;
@@ -258,12 +271,6 @@ int get_cell(int x, int y, int plane) {
     return 0;
 }
 
-void read_from_region(int x0, int y0, int sX, int sY, char * src) {
-    for(int y = 0; y < sY; y ++)
-        for (int x = 0; x < sX; x ++)
-            set_cell(x + x0, y + y0, src[y * sX + x] == 'x', 0, 0);
-}
-
 void life_infin_print(int x0, int x1, int y0, int y1, int plane, int dbg) {
     for(int y = y0; y <= y1; y ++) {
         for(int x = x0; x <= x1; x ++) {
@@ -285,7 +292,7 @@ void find_envelope_box(struct Box * w, int plane, int * xmin, int * xmax, int * 
         char * start = w0->cells0 + N0*N0*plane;
         char * end = w0->cells0 + N0*N0*(1 + plane);
         for (char * p = start; p < end; p ++) {
-            if (!*p) continue;
+            if (*p != 1) continue;
             int idx = p - start;
             int y = w->y0 + idx / N0;
             int x = w->x0 + idx % N0;
@@ -306,13 +313,36 @@ void find_envelope_box(struct Box * w, int plane, int * xmin, int * xmax, int * 
 extern int * find_envelope() {
     int env[4];
     int * ret = env;
-    env[0] = 1<<30;
-    env[1] = -(2<<30);
-    env[2] = env[0];
-    env[3] = env[1];
-    find_envelope_box(world, active_plane, env, env+1, env+2, env+3);
-    printf("Envelope: X[%d, %d], Y[%d, %d]\n", env[0], env[1], env[2], env[3]);
+
+    env[0] = env_xmin;
+    env[1] = env_xmax;
+    env[2] = env_ymin;
+    env[3] = env_ymax;
+
+//    printf("Envelope: X[%d, %d], Y[%d, %d]\n", env[0], env[1], env[2], env[3]);
     return ret;
+}
+
+void set_envelope(int xmin, int xmax, int ymin, int ymax) {
+    env_xmin = xmin;
+    env_xmax = xmax;
+    env_ymin = ymin;
+    env_ymax = ymax;
+}
+
+void recompute_envelope() {
+    int xmin, xmax, ymin, ymax;
+    find_envelope_box(world, active_plane, &xmin, &xmax, &ymin, &ymax);
+    printf("recompute_envelope: got %d %d %d %d\n", xmin, xmax, ymin, ymax);
+    set_envelope(xmin, xmax, ymin, ymax);
+}
+
+void set_region(int x0, int y0, int sX, int sY, char * src) {
+    for(int y = 0; y < sY; y ++)
+        for (int x = 0; x < sX; x ++)
+            set_cell(x + x0, y + y0, src[y * sX + x] == 'x', active_plane);
+
+    recompute_envelope ();
 }
 
 void read_region_box(struct Box * w, int plane, char * target, int x0, int y0, int sX, int sY) {
@@ -449,7 +479,17 @@ extern char * read_region_scale(int x0, int y0, int sX, int sY, int scale) {
 
 extern void life_set_cell(int x, int y, int val) {
     assert(val == 0 || val == 1);
-    set_cell(x, y, val, active_plane, 0);
+
+    set_cell(x, y, val, active_plane);
+
+    if (val == 1) {
+        if (x < env_xmin) env_xmin = x;
+        if (x > env_xmax) env_xmax = x;
+        if (y < env_ymin) env_ymin = y;
+        if (y > env_ymax) env_ymax = y;
+    }
+    else if (world && (x == env_xmin || x == env_xmax || y == env_ymin || y == env_ymax))
+        recompute_envelope ();
 }
 
 extern int life_get_cell(int x, int y) {

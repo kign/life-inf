@@ -37,7 +37,7 @@ void life_prepare_box(struct Box * w, int plane, struct Stat * stat) {
                     }
                     else
                         if (0 == get_cell(vx + w->x0, vy + w->y0, plane))
-                            set_cell(vx + w->x0, vy + w->y0, 2, plane, 0);
+                            set_cell(vx + w->x0, vy + w->y0, 2, plane);
                 }
             }
         stat->hash ^= hash;
@@ -56,7 +56,7 @@ void life_step_box(struct Box * w, int dst, int age, struct Stat * stat) {
                     if (w->cells[idx]->age == age)
                         w->age = age;
                 }
-                // we can adjust here how aggressively release empty boxes
+                // we can adjust here how aggressively to release empty boxes
                 else if (w->cells[idx]->age < age - 3) {
                     release_box(w->cells[idx]);
                     w->cells[idx] = (struct Box*) 0;
@@ -89,6 +89,13 @@ void life_step_box(struct Box * w, int dst, int age, struct Stat * stat) {
 
                 hash ^= (unsigned int)(x + w->x0) * rand_x + (unsigned int)(y + w->y0) * rand_y;
 
+                const int rx = w->x0 + x;
+                const int ry = w->y0 + y;
+                if (rx < stat->xmin) stat->xmin = rx;
+                if (rx > stat->xmax) stat->xmax = rx;
+                if (ry < stat->ymin) stat->ymin = ry;
+                if (ry > stat->ymax) stat->ymax = ry;
+
                 char * dst_st = w0->cells0 + N0*N0*dst;
                 dst_st[idx] = (char)1;
 
@@ -101,7 +108,7 @@ void life_step_box(struct Box * w, int dst, int age, struct Stat * stat) {
                         if (*xd != 1) *xd = (char)2;
                     }
                     else if (1 != get_cell(vx + w->x0, vy + w->y0, dst))
-                        set_cell(vx + w->x0, vy + w->y0, 2, dst, age);
+                        set_cell(vx + w->x0, vy + w->y0, 2, dst);
                 }
             }
         }
@@ -122,26 +129,57 @@ void life_clean_plane(struct Box * w, int dst) {
         memset((((struct Box0 *)w)->cells0 + N0*N0*dst), '\0', N0*N0);
 }
 
-void life_prepare (struct Stat * stat) {
+static unsigned int hash_0 = 0;
+static unsigned int hash_1 = 0;
+static unsigned int hash_2 = 0;
+static unsigned int hash_3 = 0;
+
+extern void life_prepare () {
     struct Box * world = get_world ();
 
     if (world) {
-        stat->count = 0;
-        stat->hash = 0;
-        life_prepare_box(world, get_active_plane(), stat);
+        struct Stat stat;
+        stat.count = 0;
+        stat.hash = 0;
+        life_prepare_box(world, get_active_plane(), &stat);
+
+        hash_0 = 0;
+        hash_1 = 0;
+        hash_2 = 0;
+        hash_3 = stat.hash;
     }
 }
 
-void life_step (int age, struct Stat * stat) {
+extern int life_step () {
     int dst = 1 - get_active_plane();
+    increment_age ();
+    const int age = get_current_age ();
+
     struct Box * world = get_world ();
+    int ret = 1;
 
     if (world) {
-        stat->count = 0;
-        stat->hash = 0;
+        struct Stat stat;
+        stat.count = 0;
+        stat.hash = 0;
+        stat.xmin = 1<<30;
+        stat.xmax = -stat.xmin;
+        stat.ymin = stat.xmin;
+        stat.ymax = stat.xmax;
+
         life_clean_plane(world, dst);
-        life_step_box(world, dst, age, stat);
+        life_step_box(world, dst, age, &stat);
+        set_envelope(stat.xmin, stat.xmax, stat.ymin, stat.ymax);
+
+
+        ret = (stat.hash == hash_0) | (stat.hash == hash_1) | (stat.hash == hash_2) | (stat.hash == hash_3);
+        hash_0 = hash_1;
+        hash_1 = hash_2;
+        hash_2 = hash_3;
+        hash_3 = stat.hash;
     }
 
     set_active_plane(dst);
+
+    return ret;
 }
