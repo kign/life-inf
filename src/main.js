@@ -18,7 +18,13 @@ function main () {
     wasm_mem = life_api.memory;
     life_api.init();
 
-    display_init(document.getElementById('map'), document.getElementById('overview'), life_api, new Uint8Array(wasm_mem.buffer));
+    const controls = {
+      cvs_map: document.getElementById('map'),
+      cvs_ovw: document.getElementById('overview'),
+      sel_mode: document.getElementById('mode')
+    };
+
+    display_init(controls, life_api);
   });
 }
 

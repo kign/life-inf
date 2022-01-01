@@ -128,12 +128,12 @@ PanZoom.prototype._redraw = function (vp) {
   });
 }
 
-function init (elm_map, elm_ovw, life_api, linear_memory) {
-  const env = get_envelope(life_api, linear_memory);
+function init (controls, life_api) {
+  const env = get_envelope(life_api);
   console.log("envelope =", env);
 
-  const ovw = new Canvas(elm_ovw, 2);
-  const map = new Canvas(elm_map, 0.5);
+  const ovw = new Canvas(controls.cvs_ovw, 2);
+  const map = new Canvas(controls.cvs_map, 0.5);
 
   map.vp = {cell: 0.3};
   map.vp.x0 = (env.x0 + env.x1)/2 - map.W/map.vp.cell/2;
@@ -141,18 +141,20 @@ function init (elm_map, elm_ovw, life_api, linear_memory) {
 
   console.log("Viewport: ", map.vp);
 
-  console.log("MAP:", map.W, map.H, elm_map.width, elm_map.height);
-  console.log("OVW:", ovw.W, ovw.H, elm_ovw.width, elm_ovw.height);
+  console.log("MAP:", map.W, map.H, controls.cvs_map.width, controls.cvs_map.height);
+  console.log("OVW:", ovw.W, ovw.H, controls.cvs_ovw.width, controls.cvs_ovw.height);
 
-  update_map (life_api, linear_memory, map, map.vp, ovw, env);
+  update_map (controls, life_api, map, map.vp, ovw, env);
 
-  const panZoom = new PanZoom(elm_map, map,
-        (cvs, vp) => update_map (life_api, linear_memory, cvs, vp, ovw, env));
+  const panZoom = new PanZoom(controls.cvs_map, map,
+        (cvs, vp) => update_map (controls, life_api, cvs, vp, ovw, env));
 
   // These events support pan with a mouse or pan/pinch zoom with multi-touch
   const pointerPanZoom = evt => {
+    if (controls.sel_mode.value !== "pan")
+      return;
     evt.preventDefault();
-    const rect = elm_map.getBoundingClientRect();
+    const rect = controls.cvs_map.getBoundingClientRect();
 
     if (evt.type === "pointerdown")
       panZoom.down(evt.pointerId, evt.clientX - rect.left, evt.clientY - rect.top);
@@ -163,43 +165,44 @@ function init (elm_map, elm_ovw, life_api, linear_memory) {
   };
 
   ["pointerdown", "pointermove", "pointerup", "pointercancel", "pointerout", "pointerleave"].forEach(x =>
-    elm_map.addEventListener(x, pointerPanZoom));
+    controls.cvs_map.addEventListener(x, pointerPanZoom));
 
   // These events support pan/zoom with a mouse wheel or a trackpad
   const wheelPanZoom = evt => {
+    if (controls.sel_mode.value !== "pan")
+      return;
     evt.preventDefault();
 
     if (evt.ctrlKey) {
-      const rect = elm_map.getBoundingClientRect();
+      const rect = controls.cvs_map.getBoundingClientRect();
       panZoom.zoom(1 - evt.deltaY * 0.01, evt.clientX - rect.left, evt.clientY - rect.top);
     }
     else
       panZoom.scroll(2, evt.deltaX, evt.deltaY);
   }
 
-  elm_map.addEventListener("mousewheel", wheelPanZoom);
+  controls.cvs_map.addEventListener("mousewheel", wheelPanZoom);
 
   const onClick = evt => {
-    if (map.vp.cell < 5) {
-      window.alert("Zoom in to select cells");
+    if (controls.sel_mode.value !== "sel")
       return;
-    }
 
-    const rect = elm_map.getBoundingClientRect();
+    const rect = controls.cvs_map.getBoundingClientRect();
     const ix = Math.floor(map.vp.x0 + (evt.clientX - rect.left)/map.vp.cell);
     const iy = Math.floor(map.vp.y0 + (evt.clientY - rect.top) /map.vp.cell);
 
     const val = life_api.life_get_cell(ix, iy);
     life_api.life_set_cell(ix, iy, 1 - val);
-    update_map (life_api, linear_memory, map, map.vp, ovw, env);
+    update_map (controls, life_api, map, map.vp, ovw, env);
   }
 
-  elm_map.addEventListener("click", onClick);
+  controls.cvs_map.addEventListener("click", onClick);
 
 }
 
-function get_envelope(life_api, linear_memory) {
+function get_envelope(life_api) {
   const envelope = life_api.find_envelope();
+  const linear_memory = new Uint8Array(life_api.memory.buffer);
   const [x0, x1, y0, y1] = [...Array(4).keys()].map(i => read_i32(linear_memory, envelope + 4*i));
   return {x0: x0, x1: x1, y0: y0, y1: y1};
 }
@@ -226,10 +229,12 @@ function update_ovw(ovw, env, win) {
   ovw.strokeRect((win.x0 - ext.x0)*scale, (win.y0 - ext.y0)*scale, (win.x1 - win.x0)*scale, (win.y1 - win.y0)*scale);
 }
 
-function update_map (life_api, linear_memory, map, vp, ovw, env) {
+function update_map (controls, life_api, map, vp, ovw, env) {
   const win = {x0: vp.x0, x1: vp.x0 + map.W/vp.cell, y0: vp.y0, y1: vp.y0 + map.H/vp.cell};
 
   update_ovw(ovw, env, win);
+
+  controls.sel_mode.disabled = vp.cell < 5;
 
   // console.log("Region: ", vp.x0, x1, vp.y0, y1);
   const [ix0, ix1, iy0, iy1] = [Math.max(env.x0, Math.floor(win.x0)), Math.min(env.x1, Math.ceil(win.x1)),
@@ -254,6 +259,8 @@ function update_map (life_api, linear_memory, map, vp, ovw, env) {
 
     assert(Xb <= nCols);
 
+    const linear_memory = new Uint8Array(life_api.memory.buffer);
+
     // console.log("Read region", ix0 + xb0, iy0, Xb, Y);
     if (scale === 1) {
       const region = life_api.read_region(ix0 + xb0, iy0, Xb, Y);
@@ -276,9 +283,6 @@ function update_map (life_api, linear_memory, map, vp, ovw, env) {
             const ys = (iy0 + y * scale - vp.y0) * vp.cell;
             map.ctx.fillRect(xs * map.scale.x, ys * map.scale.y, vp.cell * map.scale.x * scale, vp.cell * map.scale.y * scale);
           }
-
-
-
     }
   }
 }
