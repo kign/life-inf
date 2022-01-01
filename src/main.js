@@ -21,7 +21,7 @@ function main () {
     const controls = {
       cvs_map: document.getElementById('map'),
       cvs_ovw: document.getElementById('overview'),
-      sel_mode: document.getElementById('mode'),
+      cb_edit: document.getElementById('edit'),
       bt_step: document.getElementById("bt-step")
     };
 

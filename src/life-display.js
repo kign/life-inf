@@ -152,8 +152,6 @@ function init (controls, life_api) {
 
   // These events support pan with a mouse or pan/pinch zoom with multi-touch
   const pointerPanZoom = evt => {
-    if (controls.sel_mode.value !== "pan")
-      return;
     evt.preventDefault();
     const rect = controls.cvs_map.getBoundingClientRect();
 
@@ -170,8 +168,6 @@ function init (controls, life_api) {
 
   // These events support pan/zoom with a mouse wheel or a trackpad
   const wheelPanZoom = evt => {
-    if (controls.sel_mode.value !== "pan")
-      return;
     evt.preventDefault();
 
     if (evt.ctrlKey) {
@@ -185,18 +181,12 @@ function init (controls, life_api) {
   controls.cvs_map.addEventListener("mousewheel", wheelPanZoom);
 
   const onClick = evt => {
-    if (controls.sel_mode.value !== "sel")
+    if (!controls.cb_edit.checked)
       return;
 
     const rect = controls.cvs_map.getBoundingClientRect();
     const ix = Math.floor(map.vp.x0 + (evt.clientX - rect.left)/map.vp.cell);
     const iy = Math.floor(map.vp.y0 + (evt.clientY - rect.top) /map.vp.cell);
-
-/*
-    console.log("Click: ", ix, iy);
-    if (controls.sel_mode.value !== "sel")
-      return;
-*/
 
     const val = life_api.life_get_cell(ix, iy);
     life_api.life_set_cell(ix, iy, 1 - val);
@@ -251,7 +241,16 @@ function update_map (controls, life_api, map, vp, ovw, env) {
 
   update_ovw(ovw, env, win);
 
-  controls.sel_mode.disabled = vp.cell < 5;
+  const new_disabled = vp.cell < 5;
+  if (controls.cb_edit.disabled && !new_disabled) {
+    controls.cb_edit.disabled = false;
+    controls.cb_edit.checked = controls.cb_edit_state;
+  }
+  else if (!controls.cb_edit.disabled && new_disabled) {
+    controls.cb_edit_state = controls.cb_edit.checked;
+    controls.cb_edit.checked = false;
+    controls.cb_edit.disabled = true;
+  }
 
   // console.log("Region: ", vp.x0, x1, vp.y0, y1);
   const [ix0, ix1, iy0, iy1] = [Math.max(env.x0, Math.floor(win.x0)), Math.min(env.x1, Math.ceil(win.x1)),
@@ -281,13 +280,15 @@ function update_map (controls, life_api, map, vp, ovw, env) {
     // console.log("Read region", ix0 + xb0, iy0, Xb, Y);
     if (scale === 1) {
       const region = life_api.read_region(ix0 + xb0, iy0, Xb, Y);
+      const gap = Math.floor(vp.cell/15);
 
       for (let y = 0; y < Y; y++)
         for (let x = 0; x < Xb; x++)
           if (1 === linear_memory[region + y * Xb + x]) {
             const xs = (ix0 + xb0 + x - vp.x0) * vp.cell;
             const ys = (iy0 + y - vp.y0) * vp.cell;
-            map.ctx.fillRect(xs * map.scale.x, ys * map.scale.y, vp.cell * map.scale.x, vp.cell * map.scale.y);
+            map.ctx.fillRect(xs * map.scale.x + gap/2, ys * map.scale.y + gap/2,
+                  vp.cell * map.scale.x - gap, vp.cell * map.scale.y - gap);
           }
     }
     else {
