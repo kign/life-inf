@@ -9,7 +9,7 @@ js_bundle = ../docs/bundle.js
 
 c_sources = life-main.c life-inf.c board.c
 h_sources = life-inf.h
-js_sources = life-display.js main.js
+js_sources = life-display.js main.js reset-dlg.js
 
 build : $(wasm_bundle) $(js_bundle)
 

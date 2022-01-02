@@ -20,7 +20,7 @@ void life_prepare_box(struct Box * w, int plane, struct Stat * stat) {
         int cnt = 0;
         for(int idx = plane*(N0*N0); idx < (plane+1)*(N0*N0); idx ++)
             if (w0->cells0[idx] == 1) {
-                int y = idx / N0;
+                int y = idx / N0 - plane * N0;
                 int x = idx % N0;
 
                 cnt ++;
@@ -31,7 +31,7 @@ void life_prepare_box(struct Box * w, int plane, struct Stat * stat) {
                     int vx = x + j % 3 - 1;
                     int vy = y + j / 3 - 1;
                     if (0 <= vx && vx < N0 && 0 <= vy && vy < N0) {
-                        int ind = vy * N0 + vx;
+                        int ind = vy * N0 + vx + plane * (N0*N0);
                         if (0 == w0->cells0[ind])
                             w0->cells0[ind] = 2;
                     }

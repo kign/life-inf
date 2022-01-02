@@ -495,3 +495,12 @@ extern void life_set_cell(int x, int y, int val) {
 extern int life_get_cell(int x, int y) {
     return 1 == get_cell(x, y, active_plane);
 }
+
+extern void clear() {
+    release_box(world);
+    world = 0;
+    env_xmin = 1<<30;
+    env_xmax = -(1<<30);
+    env_ymin = 1<<30;
+    env_ymax = -(1<<30);
+}

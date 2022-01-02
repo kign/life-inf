@@ -17,6 +17,58 @@ td#controls > span {
 canvas {
 	touch-action:none;
 }
+
+.dlg-container {
+	display: block;
+	position: fixed;
+	left: 0;
+	top: 0;
+	z-index: 9999;
+	width: 100%;
+	height: 100%;
+	padding-top: 100px;
+	background-color: black;
+	background-color: rgba(0, 0, 0, 0.4);
+	-webkit-transition: 0.5s;
+	overflow: auto;
+	transition: all 0.3s linear;
+}
+
+.dlg-content {
+	background-color: #fefefe;
+	margin: auto;
+	padding: 20px;
+	border-radius: 4px;
+	max-width: 510px;
+	height: auto;
+}
+
+.dlg-close {
+	color: #aaaaaa;
+	float: right;
+	font-size: 16px;
+}
+
+.dlg-close:hover, .dlg-close:focus {
+	color: #000;
+	text-decoration: none;
+	cursor: pointer;
+}
+
+.dlg-content > div {
+	display: inline-block;
+	vertical-align: top;
+	border-width: 3px;
+	border-style: solid;
+	padding: 3px 3px 0;
+	border-color: white;
+	border-radius: 3px;
+}
+
+.dlg-content > div:hover, .dlg-content > div:focus {
+	border-color: lightblue;
+}
+
 </style>
 </head>
 <body>
@@ -41,12 +93,31 @@ canvas {
 			</div>
 			<hr>
 			<button id="bt-reset">Reset</button>
-			<button id="bt-random">Random</button>
-			<span>Density</span>
-			<input title="Density" id="txt-random" type="text" style="width: 8ex;">
 		</td>
 	</tr>
 </table>
+<div id="reset-dlg" class="dlg-container" style="display: none">
+	<div class="dlg-content">
+		<span class="dlg-close">&times;</span>
+		<div data-life="..x|xxx|.x.">
+			<svg width="150" height="150">
+			</svg>
+		</div>
+		<div data-life=".xx|x.x|..x">
+			<svg width="150" height="150">
+			</svg>
+		</div>
+		<div style="width: 155px; height: 155px;" data-type="random">
+			<div style="text-align: center; padding: 20px;">
+				<div style="font-size: x-large;">Random</div>
+				<label style="display: block; margin-top: 10px;">
+					Density
+					<input style="width: 20%" type="text" value="0.3">
+				</label>
+			</div>
+		</div>
+	</div>
+</div>
 <script src="bundle.js"></script>
 </body>
 </html>

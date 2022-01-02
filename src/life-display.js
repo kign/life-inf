@@ -1,4 +1,6 @@
 const assert = require("assert");
+const dlg_reset = require('./reset-dlg');
+
 const {read_i32} = require('../external/wasm-printf');
 
 const RESERVED_REGION = 10000;
@@ -129,6 +131,8 @@ PanZoom.prototype._redraw = function (vp) {
 }
 
 function init (controls, life_api) {
+  const default_cell = 20;
+
   let env = get_envelope(life_api);
   console.log("envelope =", env);
   let manually_changed = true;
@@ -136,7 +140,7 @@ function init (controls, life_api) {
   const ovw = new Canvas(controls.cvs_ovw, 2);
   const map = new Canvas(controls.cvs_map, 0.5);
 
-  map.vp = {cell: 20};
+  map.vp = {cell: default_cell};
   map.vp.x0 = (env.x0 + env.x1)/2 - map.W/map.vp.cell/2;
   map.vp.y0 = (env.y0 + env.y1)/2 - map.H/map.vp.cell/2;
 
@@ -205,6 +209,43 @@ function init (controls, life_api) {
     update_map (controls, life_api, map, map.vp, ovw, env);
     manually_changed = false;
   });
+
+  controls.bt_reset.addEventListener("click", function () {
+    dlg_reset.show(sel => {
+      reset_board(life_api, map, sel);
+
+      env = get_envelope(life_api);
+      map.vp = {cell: default_cell};
+      map.vp.x0 = (env.x0 + env.x1)/2 - map.W/map.vp.cell/2;
+      map.vp.y0 = (env.y0 + env.y1)/2 - map.H/map.vp.cell/2;
+
+      manually_changed = true;
+      update_map (controls, life_api, map, map.vp, ovw, env);
+    });
+  });
+}
+
+function reset_board(life_api, map, sel) {
+  life_api.clear ();
+
+  if (sel.type === "life") {
+    const s_rows = sel.life.split('|');
+    const Y = s_rows.length;
+    const X = s_rows[0].length;
+    for (let y = 0; y < Y; y ++)
+      for (let x = 0; x < X; x ++)
+        if (s_rows[y][x] === 'x')
+          life_api.life_set_cell(x, y, 1);
+  }
+  else if (sel.type === "random") {
+    const [ix0, ix1] = [Math.ceil(map.vp.x0), Math.floor(map.vp.x0 + map.W/map.vp.cell)];
+    const [iy0, iy1] = [Math.ceil(map.vp.y0), Math.floor(map.vp.y0 + map.H/map.vp.cell)];
+
+    for (let y = iy0; y <= iy1; y ++)
+      for (let x = ix0; x <= ix1; x ++)
+        if (Math.random() < sel.density)
+          life_api.life_set_cell(x, y, 1);
+  }
 }
 
 function get_envelope(life_api) {

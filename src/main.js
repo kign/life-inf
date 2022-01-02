@@ -22,7 +22,8 @@ function main () {
       cvs_map: document.getElementById('map'),
       cvs_ovw: document.getElementById('overview'),
       cb_edit: document.getElementById('edit'),
-      bt_step: document.getElementById("bt-step")
+      bt_step: document.getElementById("bt-step"),
+      bt_reset: document.getElementById("bt-reset")
     };
 
     display_init(controls, life_api);
