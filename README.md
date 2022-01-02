@@ -7,13 +7,49 @@ on a potentially infinite board.
 
 ## Web demo
 
-[https://kign.github.io/life-inf](https://kign.github.io/life-inf/).
+[https://kign.github.io/life-inf](https://kign.github.io/life-inf/)
 
 ![Web UI Screenshot](https://github.com/kign/life-inf/blob/master/etc/life_inf_web_ui.png?raw=true "Web UI Screenshot" )
 
 ## Implementation
 
-In progress...
+The core algorithm is implemented in C, and has a theoretical capacity to support a board up to 
+the size of 32-bit integers (that is, -2<sup>31</sup> ⩽ _x_,_y_ ⩽ 2<sup>31</sup>-1).
+Current API is as follows:
+
+```c
+// initialization
+void init ();
+
+// get and set individual cell 
+int life_get_cell(int x, int y);
+void life_set_cell(int x, int y, int val);
+
+// read region as char array
+char * read_region(int x0, int y0, int sX, int sY);
+char * read_region_scale(int x0, int y0, int sX, int sY, int scale);
+
+// Get xmin, xmax, ymin, ymax in int[4] array
+int * find_envelope();
+
+// Clear the board
+void clear();
+
+// Game of Life single step. If initial position or manually edited, life_prepare() must be called.
+void life_prepare ();
+// Returns non-zero if a cycle has been found
+int life_step ();
+```
+
+Implementation uses tree of embedded squares (not unlike [octree](https://en.wikipedia.org/wiki/Octree) in 2D),
+of customizable sizes (known at compile time). Lowest-level square contains arrays of cells, higher level squares
+have array of embedded cells.
+
+For the purpose of Web UI, C implementation is compiled to Web Assembly with [c4wa compiler](https://github.com/kign/c4wa).
+It uses fixed-size memory manager for Web Assembly; see details 
+[here](https://github.com/kign/c4wa/blob/master/etc/doc/language.md#memory-managers). Intermediary WAT file
+(**W**eb **A**ssembly **T**ext format) for Web Assembly bundle is preserved 
+[here](https://github.com/kign/life-inf/blob/master/etc/bundle.wat).
 
 ## Development
 
