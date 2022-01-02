@@ -11,6 +11,8 @@ on a potentially infinite board.
 
 ![Web UI Screenshot](https://github.com/kign/life-inf/blob/master/etc/life_inf_web_ui.png?raw=true "Web UI Screenshot" )
 
+All usual Pan/Zoom gestures are supported.
+
 ## Implementation
 
 The core algorithm is implemented in C, and has a theoretical capacity to support a board up to 
@@ -25,7 +27,7 @@ void init ();
 int life_get_cell(int x, int y);
 void life_set_cell(int x, int y, int val);
 
-// read region as char array
+// read region as char array (sX*sY <= RESERVED_REGION, a compile-time constant).
 char * read_region(int x0, int y0, int sX, int sY);
 char * read_region_scale(int x0, int y0, int sX, int sY, int scale);
 
@@ -43,13 +45,23 @@ int life_step ();
 
 Implementation uses tree of embedded squares (not unlike [octree](https://en.wikipedia.org/wiki/Octree) in 2D),
 of customizable sizes (known at compile time). Lowest-level square contains arrays of cells, higher level squares
-have array of embedded cells.
+have array of embedded cells. Further, lowest-level squares have two separate arrays, which is what we call "planes"; 
+at every step one plane is considered "source", and the other is "destination", 
+and then they swap on the subsequent step.
 
-For the purpose of Web UI, C implementation is compiled to Web Assembly with [c4wa compiler](https://github.com/kign/c4wa).
+In addition to processing all cells in the destination plane according to Conway's rules, we also mark separately 
+all neighbour cells to "live" (== marked as "1") cells; this allows on the next step bypass all cells not marked
+as either "1" and "2". This necessitates special "prepare" API call on an initial (or manually edited) position.
+
+For the purpose of Web UI, C source is compiled to Web Assembly with [c4wa compiler](https://github.com/kign/c4wa).
 It uses fixed-size memory manager for Web Assembly; see details 
 [here](https://github.com/kign/c4wa/blob/master/etc/doc/language.md#memory-managers). Intermediary WAT file
 (**W**eb **A**ssembly **T**ext format) for Web Assembly bundle is preserved 
 [here](https://github.com/kign/life-inf/blob/master/etc/bundle.wat).
+
+Note that since it's problematic in Web Assembly to return multiple primitive values from an exported
+functions, API is designed to work around this problem by returning an array pointer instead. See discussion 
+[here](https://github.com/kign/c4wa/blob/master/etc/doc/language.md#use-case-returning-complex-data-types-from-exported-functions). 
 
 ## Development
 
