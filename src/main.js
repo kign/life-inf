@@ -23,7 +23,11 @@ function main () {
       cvs_ovw: document.getElementById('overview'),
       cb_edit: document.getElementById('edit'),
       bt_step: document.getElementById("bt-step"),
-      bt_reset: document.getElementById("bt-reset")
+      bt_walk: document.getElementById("bt-walk"),
+      bt_run: document.getElementById("bt-run"),
+      bt_reset: document.getElementById("bt-reset"),
+      lb_gen: document.getElementById("lb-gen"),
+      txt_int: document.getElementById("txt-int")
     };
 
     display_init(controls, life_api);

@@ -134,6 +134,9 @@ function init (controls, life_api) {
   const default_cell = 20;
 
   let env = get_envelope(life_api);
+  let generation = 1;
+  let walkInt = null;
+
   console.log("envelope =", env);
   let manually_changed = true;
 
@@ -201,13 +204,47 @@ function init (controls, life_api) {
 
   controls.cvs_map.addEventListener("click", onClick);
 
-  controls.bt_step.addEventListener("click", function () {
-    if (manually_changed)
-      life_api.life_prepare ();
+  const one_step = () => {
+    if (manually_changed) {
+      life_api.life_prepare();
+      generation = 1;
+      manually_changed = false;
+    }
     life_api.life_step();
+    generation ++;
     env = get_envelope(life_api);
     update_map (controls, life_api, map, map.vp, ovw, env);
-    manually_changed = false;
+    controls.lb_gen.innerText = generation;
+  };
+
+  controls.bt_step.addEventListener("click", one_step);
+
+  controls.bt_walk.addEventListener("click", function () {
+    if (walkInt) {
+      window.clearInterval(walkInt);
+      walkInt = null;
+
+      controls.bt_step.disabled = false;
+      controls.bt_walk.innerText = controls.bt_walk.dataset.value;
+      controls.bt_run.disabled = false;
+    }
+    else {
+      const val = controls.txt_int.value;
+      const f_val = parseFloat(val);
+      if (isNaN(f_val))
+        alert("Invalid interval " + val);
+      else {
+        walkInt = window.setInterval(one_step, 1000 * Math.max(1 / 60, f_val));
+        controls.bt_step.disabled = true;
+        controls.bt_walk.dataset.value = controls.bt_walk.innerText;
+        controls.bt_walk.innerText = "Stop";
+        controls.bt_run.disabled = true;
+      }
+    }
+  });
+
+  controls.bt_run.addEventListener("click", function () {
+
   });
 
   controls.bt_reset.addEventListener("click", function () {
@@ -223,6 +260,7 @@ function init (controls, life_api) {
       update_map (controls, life_api, map, map.vp, ovw, env);
     });
   });
+
 }
 
 function reset_board(life_api, map, sel) {
