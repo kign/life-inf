@@ -32,6 +32,7 @@ Canvas.prototype.strokeRect = function(x, y, w, h) {
 }
 
 Canvas.prototype.update_vp = function () {
+  assert(this.vp_temp.cell);
   this.vp = this.vp_temp;
   this.vp_temp = {};
 }
@@ -76,7 +77,7 @@ PanZoom.prototype.down = function (id, x, y) {
 
   this.elm.setPointerCapture(id);
   this.touches.push({id: id, x0: x, y0: y, x: x, y : y});
-  // this.cvs.vp_temp = {...this.cvs.vp};
+  this.cvs.vp_temp = {...this.cvs.vp};
 }
 
 PanZoom.prototype._adjust_vp = function(a, b) {
@@ -140,12 +141,13 @@ function init (controls, life_api) {
   let env = get_envelope(life_api);
   let generation = 1;
   let walkInt = null;
+  let is_running = false;
 
   console.log("envelope =", env);
   let manually_changed = true;
 
   const ovw = new Canvas(controls.cvs_ovw, 2);
-  const map = new Canvas(controls.cvs_map, 0.5);
+  const map = new Canvas(controls.cvs_map, 2);
 
   map.vp = {cell: default_cell};
   map.vp.x0 = (env.x0 + env.x1)/2 - map.W/map.vp.cell/2;
@@ -248,7 +250,51 @@ function init (controls, life_api) {
     }
   });
 
+  const runTillStopped = () => {
+    const limit = 0.1;
+    const t0 = window.performance.now();
+    do {
+      life_api.life_step();
+      generation++;
+    }
+    while(is_running && window.performance.now() < t0 + 1000 * limit);
+
+    env = get_envelope(life_api);
+    update_map (controls, life_api, map, map.vp_temp, ovw, env);
+    controls.lb_gen.innerText = generation;
+
+    if (is_running)
+      window.setTimeout(runTillStopped, 0);
+    else {
+      controls.bt_step.disabled = false;
+      controls.bt_walk.disabled = false;
+      controls.bt_run.disabled = false;
+
+      controls.bt_run.innerText = controls.bt_run.dataset.value;
+    }
+  }
+
   controls.bt_run.addEventListener("click", function () {
+    if (is_running) {
+      is_running = false;
+      controls.bt_run.disabled = true;
+    }
+    else {
+      if (manually_changed) {
+        life_api.life_prepare();
+        generation = 1;
+        manually_changed = false;
+      }
+
+      controls.bt_step.disabled = true;
+      controls.bt_walk.disabled = true;
+      controls.bt_run.dataset.value = controls.bt_run.innerText;
+      controls.bt_run.innerText = "Stop";
+
+      is_running = true;
+
+      runTillStopped ();
+    }
 
   });
 
@@ -257,9 +303,11 @@ function init (controls, life_api) {
       reset_board(life_api, map, sel);
 
       env = get_envelope(life_api);
-      map.vp = {cell: default_cell};
-      map.vp.x0 = (env.x0 + env.x1)/2 - map.W/map.vp.cell/2;
-      map.vp.y0 = (env.y0 + env.y1)/2 - map.H/map.vp.cell/2;
+      if (sel.type !== "random") {
+        map.vp = {cell: default_cell};
+        map.vp.x0 = (env.x0 + env.x1) / 2 - map.W / map.vp.cell / 2;
+        map.vp.y0 = (env.y0 + env.y1) / 2 - map.H / map.vp.cell / 2;
+      }
 
       manually_changed = true;
       update_map (controls, life_api, map, map.vp_temp, ovw, env);
@@ -365,7 +413,7 @@ function update_map (controls, life_api, map, _vp, ovw, env) {
     // console.log("Read region", ix0 + xb0, iy0, Xb, Y);
     if (scale === 1) {
       const region = life_api.read_region(ix0 + xb0, iy0, Xb, Y);
-      const gap = Math.floor(vp.cell/15);
+      const gap = Math.floor(vp.cell/10);
 
       for (let y = 0; y < Y; y++)
         for (let x = 0; x < Xb; x++)
