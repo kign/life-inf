@@ -27,7 +27,8 @@ function main () {
       bt_run: document.getElementById("bt-run"),
       bt_reset: document.getElementById("bt-reset"),
       lb_gen: document.getElementById("lb-gen"),
-      txt_int: document.getElementById("txt-int")
+      txt_int: document.getElementById("txt-int"),
+      bt_find: document.getElementById("bt-find")
     };
 
     display_init(controls, life_api);

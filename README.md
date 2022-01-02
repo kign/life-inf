@@ -45,13 +45,14 @@ int life_step ();
 
 Implementation uses tree of embedded squares (not unlike [octree](https://en.wikipedia.org/wiki/Octree) in 2D),
 of customizable sizes (known at compile time). Lowest-level square contains arrays of cells, higher level squares
-have array of embedded cells. Further, lowest-level squares have two separate arrays, which is what we call "planes"; 
+have array of embedded cells. Further, lowest-level squares have two _separate_ arrays, we call them "planes"; 
 at every step one plane is considered "source", and the other is "destination", 
 and then they swap on the subsequent step.
 
 In addition to processing all cells in the destination plane according to Conway's rules, we also mark separately 
-all neighbour cells to "live" (== marked as "1") cells; this allows on the next step bypass all cells not marked
-as either "1" and "2". This necessitates special "prepare" API call on an initial (or manually edited) position.
+all neighbour cells to "live" (== marked as "1") cells; this allows to bypass on the next step all cells not marked
+as either "1" and "2". This improved efficiency, 
+but necessitates special "prepare" API call on an initial (or manually edited) position.
 
 For the purpose of Web UI, C source is compiled to Web Assembly with [c4wa compiler](https://github.com/kign/c4wa).
 It uses fixed-size memory manager for Web Assembly; see details 

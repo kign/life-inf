@@ -325,7 +325,17 @@ function init (controls, life_api) {
     });
   });
 
-}
+  controls.bt_find.addEventListener("click", function () {
+    const size = {x: env.x1 - env.x0, y: env.y1 - env.y0};
+    map.vp.cell = Math.min(map.W/size.x, map.H/size.y, default_cell);
+
+    map.vp.x0 = (env.x0 + env.x1)/2 - map.W / map.vp.cell / 2;
+    map.vp.y0 = (env.y0 + env.y1)/2 - map.H / map.vp.cell / 2;
+    update_map (controls, life_api, map, map.vp_temp, ovw, env);
+  });
+
+
+  }
 
 function reset_board(life_api, map, sel) {
   life_api.clear ();
@@ -403,14 +413,16 @@ function update_map (controls, life_api, map, _vp, ovw, env) {
   // console.log("Integer region:", ix0, ix1, iy0, iy1);
   const scale = Math.ceil(1/vp.cell);
   const [X, Y] = [ix1 - ix0 + 1, iy1 - iy0 + 1];
+
+  map.ctx.fillStyle = COLORS.map.bg;
+  map.ctx.fillRect(0, 0, map.W * map.scale.x, map.H * map.scale.y);
+
   if (X <= 0 || Y <= 0) return;
 
   const Ys = Math.ceil(Y/scale);
   const nCols = scale * Math.floor(Math.min(X, Math.floor(scale * RESERVED_REGION/Ys)) / scale);
   assert(nCols > 0);
 
-  map.ctx.fillStyle = COLORS.map.bg;
-  map.ctx.fillRect(0, 0, map.W * map.scale.x, map.H * map.scale.y);
   map.ctx.fillStyle = COLORS.map.cell;
 
   for(let iBand = 0; nCols * iBand < X; iBand ++) {
