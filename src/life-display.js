@@ -31,10 +31,14 @@ Canvas.prototype.strokeRect = function(x, y, w, h) {
   this.ctx.strokeRect(x*this.scale.x, y*this.scale.y, w*this.scale.x, h*this.scale.y);
 }
 
+Canvas.prototype.update_vp = function () {
+  this.vp = this.vp_temp;
+  this.vp_temp = {};
+}
+
 function PanZoom(elm, cvs, update_fn) {
   this.elm = elm;
   this.cvs = cvs;
-  this.vp = {};
   this.update_fn = update_fn;
   this.touches = [];
   this.ts = 0;
@@ -44,7 +48,7 @@ PanZoom.prototype.scroll = function (k, dx, dy) {
   this.cvs.vp.x0 += k * dx / this.cvs.vp.cell;
   this.cvs.vp.y0 += k * dy / this.cvs.vp.cell;
 
-  this._redraw(this.cvs.vp);
+  this._redraw();
 }
 
 PanZoom.prototype.zoom = function (k, x, y) {
@@ -54,7 +58,7 @@ PanZoom.prototype.zoom = function (k, x, y) {
   this.cvs.vp.x0 = o.x - d.x/k;
   this.cvs.vp.y0 = o.y - d.y/k;
 
-  this._redraw(this.cvs.vp);
+  this._redraw();
 }
 
 PanZoom.prototype.down = function (id, x, y) {
@@ -64,7 +68,7 @@ PanZoom.prototype.down = function (id, x, y) {
     return;
 
   if (this.touches.length === 1) {
-    this.cvs.vp = {...this.vp};
+    this.cvs.update_vp ();
     const t = this.touches[0];
     t.x0 = t.x;
     t.y0 = t.y;
@@ -72,25 +76,25 @@ PanZoom.prototype.down = function (id, x, y) {
 
   this.elm.setPointerCapture(id);
   this.touches.push({id: id, x0: x, y0: y, x: x, y : y});
-  this.vp = {...this.cvs.vp};
+  // this.cvs.vp_temp = {...this.cvs.vp};
 }
 
 PanZoom.prototype._adjust_vp = function(a, b) {
+  const os = this.cvs.vp.cell;
   if (b) {
     const old_d = (a.x0 - b.x0)**2 + (a.y0 - b.y0)**2;
     const new_d = (a.x - b.x)**2 + (a.y - b.y)**2;
-    const os = this.cvs.vp.cell;
     const ns = os * new_d/old_d;
     const shift = {x: ((a.x + b.x)/ns - (a.x0 + b.x0)/os)/2, y: ((a.y + b.y)/ns - (a.y0 + b.y0)/os)/2};
 
-    this.vp.cell = ns;
-    this.vp.x0 = this.cvs.vp.x0 - shift.x;
-    this.vp.y0 = this.cvs.vp.y0 - shift.y;
+    this.cvs.vp_temp.cell = ns;
+    this.cvs.vp_temp.x0 = this.cvs.vp.x0 - shift.x;
+    this.cvs.vp_temp.y0 = this.cvs.vp.y0 - shift.y;
   }
   else {
-    this.vp.cell = this.cvs.vp.cell;
-    this.vp.x0 = this.cvs.vp.x0 - (a.x - a.x0) / this.vp.cell;
-    this.vp.y0 = this.cvs.vp.y0 - (a.y - a.y0) / this.vp.cell;
+    this.cvs.vp_temp.cell = os;
+    this.cvs.vp_temp.x0 = this.cvs.vp.x0 - (a.x - a.x0) / os;
+    this.cvs.vp_temp.y0 = this.cvs.vp.y0 - (a.y - a.y0) / os;
   }
 }
 
@@ -102,7 +106,7 @@ PanZoom.prototype.move = function (id, x, y) {
   this.touches[idx].y = y;
 
   this._adjust_vp(...this.touches);
-  this._redraw(this.vp);
+  this._redraw();
 }
 
 PanZoom.prototype.up = function (id) {
@@ -111,7 +115,7 @@ PanZoom.prototype.up = function (id) {
 
   this.touches.splice(idx, 1);
   this.elm.releasePointerCapture(id);
-  this.cvs.vp = {...this.vp};
+  this.cvs.update_vp();
 
   if (this.touches.length === 1) {
     const t = this.touches[0];
@@ -120,8 +124,8 @@ PanZoom.prototype.up = function (id) {
   }
 }
 
-PanZoom.prototype._redraw = function (vp) {
-  const frozen_vp = {...vp};
+PanZoom.prototype._redraw = function () {
+  const frozen_vp = {...this.cvs.vp_temp};
   window.requestAnimationFrame(ts => {
     if (ts > this.ts) {
       this.ts = ts;
@@ -146,13 +150,14 @@ function init (controls, life_api) {
   map.vp = {cell: default_cell};
   map.vp.x0 = (env.x0 + env.x1)/2 - map.W/map.vp.cell/2;
   map.vp.y0 = (env.y0 + env.y1)/2 - map.H/map.vp.cell/2;
+  map.vp_temp = {};
 
   console.log("Viewport: ", map.vp);
 
   console.log("MAP:", map.W, map.H, controls.cvs_map.width, controls.cvs_map.height);
   console.log("OVW:", ovw.W, ovw.H, controls.cvs_ovw.width, controls.cvs_ovw.height);
 
-  update_map (controls, life_api, map, map.vp, ovw, env);
+  update_map (controls, life_api, map, map.vp_temp, ovw, env);
 
   const panZoom = new PanZoom(controls.cvs_map, map,
         (cvs, vp) => update_map (controls, life_api, cvs, vp, ovw, env));
@@ -198,7 +203,7 @@ function init (controls, life_api) {
     const val = life_api.life_get_cell(ix, iy);
     life_api.life_set_cell(ix, iy, 1 - val);
     env = get_envelope(life_api);
-    update_map (controls, life_api, map, map.vp, ovw, env);
+    update_map (controls, life_api, map, map.vp_temp, ovw, env);
     manually_changed = true;
   }
 
@@ -213,7 +218,7 @@ function init (controls, life_api) {
     life_api.life_step();
     generation ++;
     env = get_envelope(life_api);
-    update_map (controls, life_api, map, map.vp, ovw, env);
+    update_map (controls, life_api, map, map.vp_temp, ovw, env);
     controls.lb_gen.innerText = generation;
   };
 
@@ -257,7 +262,7 @@ function init (controls, life_api) {
       map.vp.y0 = (env.y0 + env.y1)/2 - map.H/map.vp.cell/2;
 
       manually_changed = true;
-      update_map (controls, life_api, map, map.vp, ovw, env);
+      update_map (controls, life_api, map, map.vp_temp, ovw, env);
     });
   });
 
@@ -315,7 +320,8 @@ function update_ovw(ovw, env, win) {
   ovw.strokeRect((win.x0 - ext.x0)*scale, (win.y0 - ext.y0)*scale, (win.x1 - win.x0)*scale, (win.y1 - win.y0)*scale);
 }
 
-function update_map (controls, life_api, map, vp, ovw, env) {
+function update_map (controls, life_api, map, _vp, ovw, env) {
+  const vp = _vp.cell === undefined ? map.vp : _vp;
   const win = {x0: vp.x0, x1: vp.x0 + map.W/vp.cell, y0: vp.y0, y1: vp.y0 + map.H/vp.cell};
 
   update_ovw(ovw, env, win);

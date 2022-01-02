@@ -1,10 +1,15 @@
 #ifndef _LIFE_INF_H_
 #define _LIFE_INF_H_
 
+#if DEBUG==1
 #define assert(x) if(!(x)) { printf("‼️ ASSERTION: \"" #x "\" @ line %d\n", __LINE__); abort (); }
+#else
+#define assert(x)
+#endif
 
-#define N 5
-#define N0 5
+#if !defined(N) || !defined(N0)
+#error "N and N0 must be defined"
+#endif
 
 #define RESERVED_REGION 10000
 

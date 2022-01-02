@@ -217,10 +217,13 @@ void set_cell(int x, int y, int val, int plane) {
                 if (!val) return;
                 w->cells[yp * N + xp] = alloc_new_box(w->level - 1, w->x0 + xp*size, w->y0 + yp*size);
             }
+#if DEBUG==1
             int t1 = w->level - 1;
             int t2 = w->x0 + xp*size;
             int t3 = w->y0 + yp*size;
+#endif
             w = w->cells[yp * N + xp];
+
             assert(t1 == w->level);
             assert(t2 == w->x0);
             assert(t3 == w->y0);

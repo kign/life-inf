@@ -6,6 +6,7 @@
 
 extern void init () {
 #ifdef C4WA
+    printf("Box0 = %d, Box = %d, ratio = %.4f\n", sizeof(struct Box0), sizeof(struct Box), 1.0*sizeof(struct Box)/sizeof(struct Box0));
     mm_init(RESERVED_REGION, max(sizeof(struct Box0), sizeof(struct Box)));
 #endif
 
