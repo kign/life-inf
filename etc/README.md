@@ -1,0 +1,1 @@
+File `bundle.wat` is an intermediary step to build `bundle.wasm`. It's not required, but kept here for reference.

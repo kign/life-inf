@@ -101,10 +101,12 @@ void verify(struct Box * w) {
 void set_cell(int x, int y, int val, int plane) {
     struct Box * w;
     int t, xp, yp;
+#if DEBUG
     const int verbose = 0;
 
     if (verbose)
         printf("set_cell(%d, %d, %d)\n", x, y, val);
+#endif
 
     if (!world) {
         if (!val) return;
@@ -118,10 +120,11 @@ void set_cell(int x, int y, int val, int plane) {
     int size = world->size;
     if (!(world->x0 <= x && x < world->x0 + size && world->y0 <= y && y < world->y0 + size)) {
         if (!val) return;
+#if DEBUG
         if (verbose)
             printf("Point %d, %d is outside the world %d, %d, %d, %d\n", x, y,
                     world->x0, world->x0 + size-1, world->y0, world->y0 + size-1);
-
+#endif
         int xmin = world->x0;
         if (x < xmin) {
             t = xmin - x;
@@ -147,9 +150,10 @@ void set_cell(int x, int y, int val, int plane) {
             ymax += t;
         }
 
+#if DEBUG
         if (verbose)
             printf("xmin = %d, xmax = %d, ymin = %d, ymax = %d\n", xmin, xmax, ymin, ymax);
-
+#endif
         int new_level = world->level;
         int new_size = size;
         do {
@@ -158,9 +162,10 @@ void set_cell(int x, int y, int val, int plane) {
         }
         while (new_size < xmax - xmin || new_size < ymax - ymin);
 
+#if DEBUG
         if (verbose)
             printf("Level: %d => %d, Size: %d => %d\n", world->level, new_level, size, new_size);
-
+#endif
         int dx = (new_size - xmax + xmin)/2;
         if (dx % size != 0) dx += (size - dx % size);
         int dy = (new_size - ymax + ymin)/2;
@@ -174,17 +179,20 @@ void set_cell(int x, int y, int val, int plane) {
             xp = (world->x0 - w->x0)/wsize;
             yp = (world->y0 - w->y0)/wsize;
             if (wsize == world->size) {
+#if DEBUG
                 if (verbose)
                     printf("Converged to original box @ %d, %d (size %d)\n", w->x0 + xp*wsize, w->y0 + yp*wsize, wsize);
+#endif
                 assert(w->x0 + xp*wsize == world->x0);
                 assert(w->y0 + yp*wsize == world->y0);
                 w->cells[N * yp + xp] = world;
                 break;
             }
             new_level --;
+#if DEBUG
             if (verbose)
                 printf("w->x0 = %d, xp = %d, wsize = %d, w->y0 = %d, yp = %d\n", w->x0, xp, wsize, w->y0, yp);
-
+#endif
             w->cells[N * yp + xp] = alloc_new_box(new_level, w->x0 + xp*wsize, w->y0 + yp*wsize);
             w = w->cells[N * yp + xp];
             wsize /= N;
@@ -195,15 +203,19 @@ void set_cell(int x, int y, int val, int plane) {
 
     w = world;
     do {
+#if DEBUG
         if (verbose)
             printf("Entering (%d,%d) into <%d,%d,%d,%d>\n", x, y, w->level, w->x0, w->y0, w->size);
+#endif
         assert (w->x0 <= x && x < w->x0 + w->size && w->y0 <= y && y < w->y0 + w->size);
         if (val) w->age = current_age;
         if (w->level == 0) {
             xp = x - w->x0;
             yp = y - w->y0;
+#if DEBUG
             if (verbose)
                 printf("Assigned <%d,%d,%d>[%d] = %d\n", w->level, w->x0, w->y0, yp * N0 + xp, val);
+#endif
             ((struct Box0 *)w)->cells0[N0 * N0 * plane + N0 * yp + xp] = (char) val;
             break;
         }
@@ -211,13 +223,15 @@ void set_cell(int x, int y, int val, int plane) {
             size = w->size/N;
             xp = (x - w->x0)/size;
             yp = (y - w->y0)/size;
+#if DEBUG
             if (verbose)
                 printf("Going down to level %d, xp = %d, yp = %d\n", w->level - 1, xp, yp);
+#endif
             if (!w->cells[yp * N + xp]) {
                 if (!val) return;
                 w->cells[yp * N + xp] = alloc_new_box(w->level - 1, w->x0 + xp*size, w->y0 + yp*size);
             }
-#if DEBUG==1
+#if DEBUG
             int t1 = w->level - 1;
             int t2 = w->x0 + xp*size;
             int t3 = w->y0 + yp*size;
@@ -235,12 +249,16 @@ void set_cell(int x, int y, int val, int plane) {
         }
     }
     while(1);
+#if DEBUG
     if (verbose)
         printf("Done!\n");
+#endif
 }
 
 int get_cell(int x, int y, int plane) {
+#if DEBUG
     const int verbose = 0;
+#endif
     int xp, yp, size;
 
     if (!world)
@@ -251,22 +269,28 @@ int get_cell(int x, int y, int plane) {
         return 0;
 
     do {
+#if DEBUG
         if (verbose)
             printf("Trying to locate (%d,%d) in <%d,%d,%d,%d>\n", x, y, w->level, w->x0, w->y0, w->size);
+#endif
         assert (w->x0 <= x && x < w->x0 + w->size && w->y0 <= y && y < w->y0 + w->size);
         if (w->level == 0) {
             xp = x - w->x0;
             yp = y - w->y0;
+#if DEBUG
             if (verbose)
                 printf("Got to the bottom <%d,%d,%d>[%d]\n", w->level, w->x0, w->y0, yp * N0 + xp);
+#endif
             return (int)((struct Box0 *)w)->cells0[N0 * N0 * plane + N0 * yp + xp];
         }
         else {
             size = w->size/N;
             xp = (x - w->x0)/size;
             yp = (y - w->y0)/size;
+#if DEBUG
             if (verbose)
                 printf("Going down to level %d, xp = %d, yp = %d\n", w->level - 1, xp, yp);
+#endif
             w = w->cells[yp * N + xp];
         }
     }
@@ -336,7 +360,7 @@ void set_envelope(int xmin, int xmax, int ymin, int ymax) {
 void recompute_envelope() {
     int xmin, xmax, ymin, ymax;
     find_envelope_box(world, active_plane, &xmin, &xmax, &ymin, &ymax);
-    printf("recompute_envelope: got %d %d %d %d\n", xmin, xmax, ymin, ymax);
+//    printf("recompute_envelope: got %d %d %d %d\n", xmin, xmax, ymin, ymax);
     set_envelope(xmin, xmax, ymin, ymax);
 }
 
@@ -461,7 +485,7 @@ void read_region_box_scale(struct Box * w, int plane, char * target, int x0, int
 }
 
 extern char * read_region_scale(int x0, int y0, int sX, int sY, int scale) {
-    assert(1 <= scale && scale <= 100);
+    assert(1 <= scale && scale <= (1<<30));
 
     if (sX * sY > RESERVED_REGION) {
         printf("Asked for %d cells, over the limit %d\n", sX * sY, RESERVED_REGION);

@@ -217,24 +217,31 @@ function init (controls, life_api) {
       generation = 1;
       manually_changed = false;
     }
-    life_api.life_step();
+    const cycle = life_api.life_step() !== 0;
     generation ++;
     env = get_envelope(life_api);
     update_map (controls, life_api, map, map.vp_temp, ovw, env);
     controls.lb_gen.innerText = generation;
+
+    if (cycle && walkInt)
+      cancelWalk();
   };
 
   controls.bt_step.addEventListener("click", one_step);
 
-  controls.bt_walk.addEventListener("click", function () {
-    if (walkInt) {
-      window.clearInterval(walkInt);
-      walkInt = null;
+  const cancelWalk = () => {
+    window.clearInterval(walkInt);
+    walkInt = null;
 
-      controls.bt_step.disabled = false;
-      controls.bt_walk.innerText = controls.bt_walk.dataset.value;
-      controls.bt_run.disabled = false;
-    }
+    controls.bt_step.disabled = false;
+    controls.bt_walk.innerText = controls.bt_walk.dataset.value;
+    controls.bt_run.disabled = false;
+  }
+
+  controls.bt_walk.addEventListener("click", function () {
+    if (walkInt)
+      cancelWalk();
+
     else {
       const val = controls.txt_int.value;
       const f_val = parseFloat(val);
@@ -253,11 +260,15 @@ function init (controls, life_api) {
   const runTillStopped = () => {
     const limit = 0.1;
     const t0 = window.performance.now();
+    let cycle = false;
     do {
-      life_api.life_step();
+      cycle = life_api.life_step() !== 0;
       generation++;
     }
-    while(is_running && window.performance.now() < t0 + 1000 * limit);
+    while(is_running && !cycle && window.performance.now() < t0 + 1000 * limit);
+
+    if (cycle)
+      is_running = false;
 
     env = get_envelope(life_api);
     update_map (controls, life_api, map, map.vp_temp, ovw, env);

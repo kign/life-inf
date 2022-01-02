@@ -29,7 +29,6 @@ clean :
 	rm -f $(wasm_bundle) $(js_bundle)
 
 start: build
-	ln -sf ../docs/life-web.html ../docs/index.html
 	$(light-server) -s ../docs -p $(port) -w "Makefile,*.js,*.c,*h,../docs/*.html,../docs/*.css # make"
 
 run: start
