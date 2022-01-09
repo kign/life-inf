@@ -32,3 +32,7 @@ start: build
 	$(light-server) -s ../docs -p $(port) -w "Makefile,*.js,*.c,*h,../docs/*.html,../docs/*.css # make"
 
 run: start
+
+cmp: $(wasm_bundle)
+	$(c4wa-compile) $(PP_OPTS) $(c_sources) -lmm_fixed -lstring -o /tmp/bundle.wasm
+	diff /tmp/bundle.wasm $(wasm_bundle)

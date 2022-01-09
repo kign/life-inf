@@ -29,6 +29,8 @@ void life_set_cell(int x, int y, int val);
 
 // read region as char array (sX*sY <= RESERVED_REGION, a compile-time constant).
 char * read_region(int x0, int y0, int sX, int sY);
+// with scale > 1, save *count* of live cells in every scale x scale square in every output byte
+// this is used when zoomed out view can no longer resolve individual cells
 char * read_region_scale(int x0, int y0, int sX, int sY, int scale);
 
 // Get xmin, xmax, ymin, ymax in int[4] array
@@ -37,15 +39,16 @@ int * find_envelope();
 // Clear the board
 void clear();
 
-// Game of Life single step. If initial position or manually edited, life_prepare() must be called.
-void life_prepare ();
+// Game of Life single step. 
 // Returns non-zero if a cycle has been found
 int life_step ();
+// If initial position or manually edited, thus function must be called first
+void life_prepare ();
 ```
 
 Implementation uses tree of embedded squares (not unlike [octree](https://en.wikipedia.org/wiki/Octree) in 2D),
 of customizable sizes (known at compile time). Lowest-level square contains arrays of cells, higher level squares
-have array of embedded cells. Further, lowest-level squares have two _separate_ arrays, we call them "planes"; 
+contain arrays of embedded cells. Further, lowest-level squares have two _separate_ arrays, we call them _planes_; 
 at every step one plane is considered "source", and the other is "destination", 
 and then they swap on the subsequent step.
 
@@ -71,6 +74,9 @@ It needs Java 11 or above, [wat2wasm](https://github.com/WebAssembly/wabt)
 and also `gcc` compiler (any other decent C compiler would work, but you'll need to
 adjust your configuration).
 
+(NOTE: as of version 0.5 of `c4wa`, it's possible to make WASM directly, though verification 
+with `wat2wasm` is still useful. There is special target `cmp` to compare generated WASM files).
+
 Additionally, you'll need `make` and `node`+`npm`.
 
 To download required node modules, run from the project directory:
@@ -86,7 +92,8 @@ make clean # only needed once to remove production-optimized WASM file
 make run
 ```
 
-You can now open `http://localhost:9811/` in your browser. Upon any changes to source files 
+You can now open [localhost:9811](http://localhost:9811/) in your browser. 
+Upon any changes to source files, 
 Web Assembly and `browserify`'ed JavaScript bundle will be rebuilt and browser page automatically
 reloaded.
 
