@@ -37,6 +37,14 @@ Canvas.prototype.update_vp = function () {
   this.vp_temp = {};
 }
 
+Canvas.prototype.clear = function() {
+  this.ctx.clearRect(0, 0, this.W * this.scale.x, this.H * this.scale.y);
+}
+
+Canvas.prototype.showText = function(text, x, y) {
+  this.ctx.fillText(text, x * this.scale.x, y * this.scale.y);
+}
+
 function PanZoom(elm, cvs, update_fn) {
   this.elm = elm;
   this.cvs = cvs;
@@ -135,6 +143,35 @@ PanZoom.prototype._redraw = function () {
   });
 }
 
+
+function Legend(cvs_leg) {
+  this.leg = new Canvas(cvs_leg, 2);
+  this.timeoutHandler = null;
+  this.lastCell = null;
+}
+
+Legend.prototype.update_zoom = function(cell) {
+  if (this.lastCell === cell) return;
+  this.lastCell = cell;
+
+  const n = this.leg.W/cell;
+  const zoom = n.toFixed(n >= 10? 0: n > 1? 1 : n > 0.1? 2 : 3);
+  const width = 5;
+
+  if (this.timeoutHandler) {
+    window.clearTimeout(this.timeoutHandler);
+    this.timeoutHandler = null;
+  }
+
+  this.leg.clear();
+  this.leg.ctx.fillStyle = '#808080';
+  this.leg.ctx.font = "30px Arial";
+  this.leg.showText(zoom, this.leg.W/2 - 5, 15)
+  this.leg.fillRect(0, this.leg.H - width, this.leg.W, width);
+
+  this.timeoutHandler = window.setTimeout(() => this.leg.clear(), 1500);
+}
+
 function init (controls, life_api) {
   const default_cell = 20;
 
@@ -148,11 +185,14 @@ function init (controls, life_api) {
 
   const ovw = new Canvas(controls.cvs_ovw, 2);
   const map = new Canvas(controls.cvs_map, 2);
+  const legend = new Legend(controls.cvs_leg);
 
   map.vp = {cell: default_cell};
   map.vp.x0 = (env.x0 + env.x1)/2 - map.W/map.vp.cell/2;
   map.vp.y0 = (env.y0 + env.y1)/2 - map.H/map.vp.cell/2;
   map.vp_temp = {};
+
+  legend.update_zoom(map.vp.cell);
 
   console.log("Viewport: ", map.vp);
 
@@ -162,7 +202,10 @@ function init (controls, life_api) {
   update_map (controls, life_api, map, map.vp_temp, ovw, env);
 
   const panZoom = new PanZoom(controls.cvs_map, map,
-        (cvs, vp) => update_map (controls, life_api, cvs, vp, ovw, env));
+        (cvs, vp) => {
+          update_map (controls, life_api, cvs, vp, ovw, env);
+          legend.update_zoom(map.vp.cell);
+        });
 
   // These events support pan with a mouse or pan/pinch zoom with multi-touch
   const pointerPanZoom = evt => {
@@ -187,6 +230,7 @@ function init (controls, life_api) {
     if (evt.ctrlKey) {
       const rect = controls.cvs_map.getBoundingClientRect();
       panZoom.zoom(1 - evt.deltaY * 0.01, evt.clientX - rect.left, evt.clientY - rect.top);
+      legend.update_zoom(map.vp.cell);
     }
     else
       panZoom.scroll(2, evt.deltaX, evt.deltaY);
@@ -333,9 +377,7 @@ function init (controls, life_api) {
     map.vp.y0 = (env.y0 + env.y1)/2 - map.H / map.vp.cell / 2;
     update_map (controls, life_api, map, map.vp_temp, ovw, env);
   });
-
-
-  }
+}
 
 function reset_board(life_api, map, sel) {
   life_api.clear ();
@@ -459,6 +501,13 @@ function update_map (controls, life_api, map, _vp, ovw, env) {
           }
     }
   }
+
+/*
+  map.ctx.fillStyle = '#808080';
+  map.fillRect(map.W - 90, map.H - 20, 80, 5);
+  map.ctx.font = "30px Arial";
+  map.ctx.fillText("80", (map.W - 55) * map.scale.x, (map.H - 30) * map.scale.y);
+*/
 }
 
 module.exports = {

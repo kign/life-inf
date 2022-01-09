@@ -2,7 +2,7 @@ const display_init = require('./life-display').init;
 const {wasm_printf} = require('../external/wasm-printf');
 
 function main () {
-  const wasm_src = 'bundle.wasm';
+  const wasm_src = 'life-inf.wasm';
   let wasm_mem;
 
   fetch(wasm_src).then(response => {
@@ -21,6 +21,7 @@ function main () {
     const controls = {
       cvs_map: document.getElementById('map'),
       cvs_ovw: document.getElementById('overview'),
+      cvs_leg: document.getElementById('legend'),
       cb_edit: document.getElementById('edit'),
       bt_step: document.getElementById("bt-step"),
       bt_walk: document.getElementById("bt-walk"),

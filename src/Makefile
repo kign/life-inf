@@ -8,7 +8,7 @@ browserify = ../node_modules/.bin/browserify
 light-server = ../node_modules/.bin/light-server
 port = 9811
 
-wasm_bundle = ../docs/bundle.wasm
+wasm_bundle = ../docs/life-inf.wasm
 js_bundle = ../docs/bundle.js
 
 c_sources = life-main.c life-inf.c board.c
