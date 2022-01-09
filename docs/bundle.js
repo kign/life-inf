@@ -1736,7 +1736,6 @@ process.umask = function() { return 0; };
 },{}],12:[function(require,module,exports){
 const assert = require("assert");
 const dlg_reset = require('./reset-dlg');
-
 const {read_i32} = require('../external/wasm-printf');
 
 const RESERVED_REGION = 10000;
@@ -2325,6 +2324,9 @@ function init (selection_fn) {
 
   const elm_content = document.querySelector("#reset-dlg .dlg-content");
   elm_content.onclick = evt => evt.stopPropagation();
+
+  for (const elm_input of document.querySelectorAll("#reset-dlg .dlg-content input"))
+    elm_input.onclick = evt => evt.stopPropagation();
 
   const options = document.querySelectorAll("#reset-dlg .dlg-content > div");
   for (const opt of options) {

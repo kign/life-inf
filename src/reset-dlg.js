@@ -34,6 +34,9 @@ function init (selection_fn) {
   const elm_content = document.querySelector("#reset-dlg .dlg-content");
   elm_content.onclick = evt => evt.stopPropagation();
 
+  for (const elm_input of document.querySelectorAll("#reset-dlg .dlg-content input"))
+    elm_input.onclick = evt => evt.stopPropagation();
+
   const options = document.querySelectorAll("#reset-dlg .dlg-content > div");
   for (const opt of options) {
     if (opt.dataset.life)

@@ -1,6 +1,5 @@
 const assert = require("assert");
 const dlg_reset = require('./reset-dlg');
-
 const {read_i32} = require('../external/wasm-printf');
 
 const RESERVED_REGION = 10000;
