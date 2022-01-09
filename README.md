@@ -42,7 +42,7 @@ void clear();
 // Game of Life single step. 
 // Returns non-zero if a cycle has been found
 int life_step ();
-// If initial position or manually edited, thus function must be called first
+// For initial or manually changed position, this function must be called first
 void life_prepare ();
 ```
 
