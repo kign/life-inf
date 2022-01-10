@@ -349,7 +349,6 @@ function init (controls, life_api) {
 
       runTillStopped ();
     }
-
   });
 
   controls.bt_reset.addEventListener("click", function () {
@@ -500,13 +499,6 @@ function update_map (controls, life_api, map, _vp, ovw, env) {
           }
     }
   }
-
-/*
-  map.ctx.fillStyle = '#808080';
-  map.fillRect(map.W - 90, map.H - 20, 80, 5);
-  map.ctx.font = "30px Arial";
-  map.ctx.fillText("80", (map.W - 55) * map.scale.x, (map.H - 30) * map.scale.y);
-*/
 }
 
 module.exports = {
