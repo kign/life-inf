@@ -9,7 +9,6 @@ def get_args () :
     default_log_level = "debug"
     default_density = 0.25
     default_iterations = 1_000
-    default_wasm = "~/git/life-inf/docs/life-inf.wasm"
     default_wasm = os.path.realpath(os.path.join(os.path.dirname(os.path.realpath(__file__)),
                                     '..', 'docs', 'life-inf.wasm'))
     default_runtime = "wasmer"
@@ -177,12 +176,7 @@ def main(args) :
         if test_idx == 1 and not do_2nd : break
         if args.cmp_with_fin :
             logging.info("Running comparative test %d", 1 + test_idx)
-        # if test_idx > 0 :
-        #     life_inf.clear ()
-        # print("y_max =", y_max, ", y_min =", y_min)
         for y in range(Y) if test_idx is 0 else range(y_min - y0,y_max - y0 + 1):
-            # if test_idx == 1 :
-            #     print("y =", y, y + y0, life_inf.find_envelope())
             for x in range(X) if test_idx is 0 else range(x_min - x0, x_max - x0 + 1):
                 val = 1 if random.random() < args.density else 0
                 if args.cmp_with_fin :
@@ -206,8 +200,6 @@ def main(args) :
                 fx1 = x_max - x0 + x0f
                 fy0 = y_min - y0 + y0f
                 fy1 = y_max - y0 + y0f
-                # if ii >= 589 :
-                #     print(ii, x_min, x_max, y_min, y_max, fx0, fx1, fy0, fy1)
                 assert 0 <= fx0 < fx1 < Xf and 0 <= fy0 < fy1 < Yf, \
                                         f"out of bounds iter={ii} | {x_min},{x_max},{y_min},{y_max}"
                 if fx0 == 0 or fy0 == 0 or fx1 == Xf - 1 or fy1 == Yf - 1 :
@@ -224,10 +216,10 @@ def main(args) :
 
             print(f"Inf = {1e9/perf_inf:.2f} fps, fin = {1e9/perf_fin:.2f} fps, ratio = {perf_inf/perf_fin:.2f}")
 
-            grid : int = math.ceil(math.sqrt(Xf * Yf / LifeInfWasmer.RESERVED_REGION))
-            if (Xf//grid + 1) * (Yf//grid + 1) > LifeInfWasmer.RESERVED_REGION :
+            grid : int = math.ceil(math.sqrt(Xf * Yf / life_inf.RESERVED_REGION))
+            if (Xf//grid + 1) * (Yf//grid + 1) > life_inf.RESERVED_REGION :
                 grid += 1
-            assert (Xf//grid + 1) * (Yf//grid + 1) <= LifeInfWasmer.RESERVED_REGION
+            assert (Xf//grid + 1) * (Yf//grid + 1) <= life_inf.RESERVED_REGION
 
             yq = 0
             for qy in range(grid) :
