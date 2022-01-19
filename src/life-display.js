@@ -174,6 +174,8 @@ Legend.prototype.update_zoom = function(cell) {
 function init (controls, life_api) {
   const default_cell = 20;
 
+  board_from_string(life_api, "..x|xxx|.x.");
+
   let env = get_envelope(life_api);
   let generation = 1;
   let walkInt = null;
@@ -377,18 +379,22 @@ function init (controls, life_api) {
   });
 }
 
+function board_from_string(life_api, str_board) {
+  const s_rows = str_board.split('|');
+  const Y = s_rows.length;
+  const X = s_rows[0].length;
+  for (let y = 0; y < Y; y ++)
+    for (let x = 0; x < X; x ++)
+      if (s_rows[y][x] === 'x')
+        life_api.life_set_cell(x, y, 1);
+}
+
 function reset_board(life_api, map, sel) {
   life_api.clear ();
 
-  if (sel.type === "life") {
-    const s_rows = sel.life.split('|');
-    const Y = s_rows.length;
-    const X = s_rows[0].length;
-    for (let y = 0; y < Y; y ++)
-      for (let x = 0; x < X; x ++)
-        if (s_rows[y][x] === 'x')
-          life_api.life_set_cell(x, y, 1);
-  }
+  if (sel.type === "life")
+    board_from_string(life_api, sel.life);
+
   else if (sel.type === "random") {
     const [ix0, ix1] = [Math.ceil(map.vp.x0), Math.floor(map.vp.x0 + map.W/map.vp.cell)];
     const [iy0, iy1] = [Math.ceil(map.vp.y0), Math.floor(map.vp.y0 + map.H/map.vp.cell)];

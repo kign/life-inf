@@ -332,7 +332,6 @@ void find_envelope_box(struct Box * w, int plane, int * xmin, int * xmax, int * 
             if (x > *xmax)
                 *xmax = x;
         }
-
 #undef w0
     }
 }
@@ -358,7 +357,10 @@ void set_envelope(int xmin, int xmax, int ymin, int ymax) {
 }
 
 void recompute_envelope() {
-    int xmin, xmax, ymin, ymax;
+    int xmin = 1<<30;
+    int xmax = -(1<<30);
+    int ymin = 1<<30;
+    int ymax = -(1<<30);
     find_envelope_box(world, active_plane, &xmin, &xmax, &ymin, &ymax);
 //    printf("recompute_envelope: got %d %d %d %d\n", xmin, xmax, ymin, ymax);
     set_envelope(xmin, xmax, ymin, ymax);
