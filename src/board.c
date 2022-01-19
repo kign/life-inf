@@ -505,6 +505,7 @@ extern char * read_region_scale(int x0, int y0, int sX, int sY, int scale) {
 }
 
 extern void life_set_cell(int x, int y, int val) {
+//    printf("life_set_cell(%d,%d,%d)\n", x, y, val);
     assert(val == 0 || val == 1);
 
     set_cell(x, y, val, active_plane);
@@ -524,8 +525,10 @@ extern int life_get_cell(int x, int y) {
 }
 
 extern void clear() {
-    release_box(world);
-    world = 0;
+    if (world) {
+        release_box(world);
+        world = 0;
+    }
     env_xmin = 1<<30;
     env_xmax = -(1<<30);
     env_ymin = 1<<30;

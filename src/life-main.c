@@ -10,6 +10,7 @@ extern void init () {
     mm_init(RESERVED_REGION, max(sizeof(struct Box0), sizeof(struct Box)));
 #endif
 
+/*
     char * initial_pos = "........."
                          ".....x..."
                          "...xxx..."
@@ -20,6 +21,8 @@ extern void init () {
     assert(sX * sY == strlen(initial_pos));
 
     set_region(0, 0, sX, sY, initial_pos);
+*/
+
 /*
 
     life_prepare();
