@@ -13,14 +13,14 @@ js_bundle = ../docs/bundle.js
 
 c_sources = life-main.c life-inf.c board.c
 h_sources = life-inf.h
-js_sources = life-display.js main.js reset-dlg.js
+js_sources = main.js canvas.js life-display.js panzoom.js reset-dlg.js
 
 build : $(wasm_bundle) $(js_bundle)
 
 $(wasm_bundle) : $(c_sources) $(h_sources) Makefile
 	gcc -Wall -Wextra -Werror $(PP_OPTS) $(c_sources) -o /dev/null
 	$(c4wa-compile) $(PP_OPTS) $(c_sources) -lmm_fixed -lstring -o /tmp/bundle.wat
-	wat2wasm --enable-bulk-memory /tmp/bundle.wat -o $@
+	wat2wasm /tmp/bundle.wat -o $@
 
 $(js_bundle): $(js_sources) Makefile
 	$(browserify) main.js -o $@

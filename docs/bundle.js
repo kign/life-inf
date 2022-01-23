@@ -1735,19 +1735,6 @@ process.umask = function() { return 0; };
 
 },{}],12:[function(require,module,exports){
 const assert = require("assert");
-const dlg_reset = require('./reset-dlg');
-const {read_i32} = require('../external/wasm-printf');
-
-const RESERVED_REGION = 10000;
-
-const COLORS = {ovw:
-                {bg: '#E0E0E0',
-                 env: '#A0E0A0',
-                 win: 'white',
-                 win_border: 'darkblue'},
-              map:
-                {bg: 'white',
-                  cell: 'darkmagenta'}};
 
 function Canvas(elm, density) {
   this.ctx = elm.getContext("2d");
@@ -1767,8 +1754,8 @@ Canvas.prototype.strokeRect = function(x, y, w, h) {
 }
 
 Canvas.prototype.update_vp = function () {
-  assert(this.vp_temp.cell);
-  this.vp = this.vp_temp;
+  assert(this.vp_temp.zoom);
+  this.vewport = this.vp_temp;
   this.vp_temp = {};
 }
 
@@ -1780,135 +1767,33 @@ Canvas.prototype.showText = function(text, x, y) {
   this.ctx.fillText(text, x * this.scale.x, y * this.scale.y);
 }
 
-function PanZoom(elm, cvs, update_fn) {
-  this.elm = elm;
-  this.cvs = cvs;
-  this.update_fn = update_fn;
-  this.touches = [];
-  this.ts = 0;
-}
+module.exports = {
+  Canvas: Canvas
+};
+},{"assert":2}],13:[function(require,module,exports){
+const assert = require("assert");
+const dlg_reset = require('./reset-dlg');
+const {PanZoom, ZoomScaleOverlay} = require('./panzoom');
+const {Canvas} = require('./canvas');
+const {read_i32} = require('../external/wasm-printf');
 
-PanZoom.prototype.scroll = function (k, dx, dy) {
-  this.cvs.vp.x0 += k * dx / this.cvs.vp.cell;
-  this.cvs.vp.y0 += k * dy / this.cvs.vp.cell;
+const RESERVED_REGION = 10000;
 
-  this._redraw();
-}
-
-PanZoom.prototype.zoom = function (k, x, y) {
-  const d = {x: x / this.cvs.vp.cell, y: y / this.cvs.vp.cell};
-  const o = {x: this.cvs.vp.x0 + d.x, y: this.cvs.vp.y0 + d.y};
-  this.cvs.vp.cell *= k;
-  this.cvs.vp.x0 = o.x - d.x/k;
-  this.cvs.vp.y0 = o.y - d.y/k;
-
-  this._redraw();
-}
-
-PanZoom.prototype.down = function (id, x, y) {
-  const idx = this.touches.findIndex(t => t.id === id);
-  if (idx >= 0) return;
-  if (this.touches.length >= 2)
-    return;
-
-  if (this.touches.length === 1) {
-    this.cvs.update_vp ();
-    const t = this.touches[0];
-    t.x0 = t.x;
-    t.y0 = t.y;
-  }
-
-  this.elm.setPointerCapture(id);
-  this.touches.push({id: id, x0: x, y0: y, x: x, y : y});
-  this.cvs.vp_temp = {...this.cvs.vp};
-}
-
-PanZoom.prototype._adjust_vp = function(a, b) {
-  const os = this.cvs.vp.cell;
-  if (b) {
-    const old_d = (a.x0 - b.x0)**2 + (a.y0 - b.y0)**2;
-    const new_d = (a.x - b.x)**2 + (a.y - b.y)**2;
-    const ns = os * new_d/old_d;
-    const shift = {x: ((a.x + b.x)/ns - (a.x0 + b.x0)/os)/2, y: ((a.y + b.y)/ns - (a.y0 + b.y0)/os)/2};
-
-    this.cvs.vp_temp.cell = ns;
-    this.cvs.vp_temp.x0 = this.cvs.vp.x0 - shift.x;
-    this.cvs.vp_temp.y0 = this.cvs.vp.y0 - shift.y;
-  }
-  else {
-    this.cvs.vp_temp.cell = os;
-    this.cvs.vp_temp.x0 = this.cvs.vp.x0 - (a.x - a.x0) / os;
-    this.cvs.vp_temp.y0 = this.cvs.vp.y0 - (a.y - a.y0) / os;
-  }
-}
-
-PanZoom.prototype.move = function (id, x, y) {
-  const idx = this.touches.findIndex(x => x.id === id);
-  if (idx < 0) return;
-
-  this.touches[idx].x = x;
-  this.touches[idx].y = y;
-
-  this._adjust_vp(...this.touches);
-  this._redraw();
-}
-
-PanZoom.prototype.up = function (id) {
-  const idx = this.touches.findIndex(x => x.id === id);
-  if (idx < 0) return;
-
-  this.touches.splice(idx, 1);
-  this.elm.releasePointerCapture(id);
-  this.cvs.update_vp();
-
-  if (this.touches.length === 1) {
-    const t = this.touches[0];
-    t.x0 = t.x;
-    t.y0 = t.y;
-  }
-}
-
-PanZoom.prototype._redraw = function () {
-  const frozen_vp = {...this.cvs.vp_temp};
-  window.requestAnimationFrame(ts => {
-    if (ts > this.ts) {
-      this.ts = ts;
-      this.update_fn(this.cvs, frozen_vp);
-    }
-  });
-}
-
-
-function Legend(cvs_leg) {
-  this.leg = new Canvas(cvs_leg, 2);
-  this.timeoutHandler = null;
-  this.lastCell = null;
-}
-
-Legend.prototype.update_zoom = function(cell) {
-  if (this.lastCell === cell) return;
-  this.lastCell = cell;
-
-  const n = this.leg.W/cell;
-  const zoom = n.toFixed(n >= 10? 0: n > 1? 1 : n > 0.1? 2 : 3);
-  const width = 5;
-
-  if (this.timeoutHandler) {
-    window.clearTimeout(this.timeoutHandler);
-    this.timeoutHandler = null;
-  }
-
-  this.leg.clear();
-  this.leg.ctx.fillStyle = '#808080';
-  this.leg.ctx.font = "30px Arial";
-  this.leg.showText(zoom, this.leg.W/2 - 5, 15)
-  this.leg.fillRect(0, this.leg.H - width, this.leg.W, width);
-
-  this.timeoutHandler = window.setTimeout(() => this.leg.clear(), 1500);
-}
+const COLORS = {ovw:
+                {bg: '#E0E0E0',
+                 env: '#A0E0A0',
+                 win: 'white',
+                 win_border: 'darkblue'},
+              map:
+                {bg: 'white',
+                  cell: 'darkmagenta'}};
 
 function init (controls, life_api) {
   const default_cell = 20;
+
+  /*
+   * One-time initialization on initial page load
+   */
 
   board_from_string(life_api, "..x|xxx|.x.");
 
@@ -1917,31 +1802,28 @@ function init (controls, life_api) {
   let walkInt = null;
   let is_running = false;
 
-  console.log("envelope =", env);
   let manually_changed = true;
 
   const ovw = new Canvas(controls.cvs_ovw, 2);
   const map = new Canvas(controls.cvs_map, 2);
-  const legend = new Legend(controls.cvs_leg);
+  const zoomScaleOverlay = new ZoomScaleOverlay(controls.cvs_leg);
 
-  map.vp = {cell: default_cell};
-  map.vp.x0 = (env.x0 + env.x1)/2 - map.W/map.vp.cell/2;
-  map.vp.y0 = (env.y0 + env.y1)/2 - map.H/map.vp.cell/2;
+  map.vewport = {zoom: default_cell, 
+            x0: (env.x0 + env.x1)/2 - map.W/default_cell/2, 
+            y0: (env.y0 + env.y1)/2 - map.H/default_cell/2};
   map.vp_temp = {};
 
-  legend.update_zoom(map.vp.cell);
-
-  console.log("Viewport: ", map.vp);
-
-  console.log("MAP:", map.W, map.H, controls.cvs_map.width, controls.cvs_map.height);
-  console.log("OVW:", ovw.W, ovw.H, controls.cvs_ovw.width, controls.cvs_ovw.height);
+  zoomScaleOverlay.update_zoom(map.vewport.zoom);
 
   update_map (controls, life_api, map, map.vp_temp, ovw, env);
 
+  /*
+   * Pan/Zoom callbacks
+   */
   const panZoom = new PanZoom(controls.cvs_map, map,
         (cvs, vp) => {
           update_map (controls, life_api, cvs, vp, ovw, env);
-          legend.update_zoom(map.vp.cell);
+          zoomScaleOverlay.update_zoom(map.vewport.zoom);
         });
 
   // These events support pan with a mouse or pan/pinch zoom with multi-touch
@@ -1967,7 +1849,7 @@ function init (controls, life_api) {
     if (evt.ctrlKey) {
       const rect = controls.cvs_map.getBoundingClientRect();
       panZoom.zoom(1 - evt.deltaY * 0.01, evt.clientX - rect.left, evt.clientY - rect.top);
-      legend.update_zoom(map.vp.cell);
+      zoomScaleOverlay.update_zoom(map.vewport.zoom);
     }
     else
       panZoom.scroll(2, evt.deltaX, evt.deltaY);
@@ -1975,13 +1857,17 @@ function init (controls, life_api) {
 
   controls.cvs_map.addEventListener("mousewheel", wheelPanZoom);
 
+  /*
+   * Turn cell on/off on click callback
+   */
   const onClick = evt => {
+    // click ignored unless checkmark is "on"
     if (!controls.cb_edit.checked)
       return;
 
     const rect = controls.cvs_map.getBoundingClientRect();
-    const ix = Math.floor(map.vp.x0 + (evt.clientX - rect.left)/map.vp.cell);
-    const iy = Math.floor(map.vp.y0 + (evt.clientY - rect.top) /map.vp.cell);
+    const ix = Math.floor(map.vewport.x0 + (evt.clientX - rect.left)/map.vewport.zoom);
+    const iy = Math.floor(map.vewport.y0 + (evt.clientY - rect.top) /map.vewport.zoom);
 
     const val = life_api.life_get_cell(ix, iy);
     life_api.life_set_cell(ix, iy, 1 - val);
@@ -1992,6 +1878,9 @@ function init (controls, life_api) {
 
   controls.cvs_map.addEventListener("click", onClick);
 
+  /*
+   * Control button callbacks
+   */
   const one_step = () => {
     if (manually_changed) {
       life_api.life_prepare();
@@ -2095,9 +1984,9 @@ function init (controls, life_api) {
 
       env = get_envelope(life_api);
       if (sel.type !== "random") {
-        map.vp = {cell: default_cell};
-        map.vp.x0 = (env.x0 + env.x1) / 2 - map.W / map.vp.cell / 2;
-        map.vp.y0 = (env.y0 + env.y1) / 2 - map.H / map.vp.cell / 2;
+        map.vewport = {zoom: default_cell};
+        map.vewport.x0 = (env.x0 + env.x1) / 2 - map.W / map.vewport.zoom / 2;
+        map.vewport.y0 = (env.y0 + env.y1) / 2 - map.H / map.vewport.zoom / 2;
       }
 
       manually_changed = true;
@@ -2107,10 +1996,10 @@ function init (controls, life_api) {
 
   controls.bt_find.addEventListener("click", function () {
     const size = {x: env.x1 - env.x0, y: env.y1 - env.y0};
-    map.vp.cell = Math.min(map.W/size.x, map.H/size.y, default_cell);
+    map.vewport.zoom = Math.min(map.W/size.x, map.H/size.y, default_cell);
 
-    map.vp.x0 = (env.x0 + env.x1)/2 - map.W / map.vp.cell / 2;
-    map.vp.y0 = (env.y0 + env.y1)/2 - map.H / map.vp.cell / 2;
+    map.vewport.x0 = (env.x0 + env.x1)/2 - map.W / map.vewport.zoom / 2;
+    map.vewport.y0 = (env.y0 + env.y1)/2 - map.H / map.vewport.zoom / 2;
     update_map (controls, life_api, map, map.vp_temp, ovw, env);
   });
 }
@@ -2132,8 +2021,8 @@ function reset_board(life_api, map, sel) {
     board_from_string(life_api, sel.life);
 
   else if (sel.type === "random") {
-    const [ix0, ix1] = [Math.ceil(map.vp.x0), Math.floor(map.vp.x0 + map.W/map.vp.cell)];
-    const [iy0, iy1] = [Math.ceil(map.vp.y0), Math.floor(map.vp.y0 + map.H/map.vp.cell)];
+    const [ix0, ix1] = [Math.ceil(map.vewport.x0), Math.floor(map.vewport.x0 + map.W/map.vewport.zoom)];
+    const [iy0, iy1] = [Math.ceil(map.vewport.y0), Math.floor(map.vewport.y0 + map.H/map.vewport.zoom)];
 
     for (let y = iy0; y <= iy1; y ++)
       for (let x = ix0; x <= ix1; x ++)
@@ -2172,12 +2061,12 @@ function update_ovw(ovw, env, win) {
 }
 
 function update_map (controls, life_api, map, _vp, ovw, env) {
-  const vp = _vp.cell === undefined ? map.vp : _vp;
-  const win = {x0: vp.x0, x1: vp.x0 + map.W/vp.cell, y0: vp.y0, y1: vp.y0 + map.H/vp.cell};
+  const vp = _vp.zoom === undefined ? map.vewport : _vp;
+  const win = {x0: vp.x0, x1: vp.x0 + map.W/vp.zoom, y0: vp.y0, y1: vp.y0 + map.H/vp.zoom};
 
   update_ovw(ovw, env, win);
 
-  const new_disabled = vp.cell < 5;
+  const new_disabled = vp.zoom < 5;
   if (controls.cb_edit.disabled && !new_disabled) {
     controls.cb_edit.disabled = false;
     controls.cb_edit.checked = controls.cb_edit_state;
@@ -2193,7 +2082,7 @@ function update_map (controls, life_api, map, _vp, ovw, env) {
                                 Math.max(env.y0, Math.floor(win.y0)), Math.min(env.y1, Math.ceil(win.y1))];
 
   // console.log("Integer region:", ix0, ix1, iy0, iy1);
-  const scale = Math.ceil(1/vp.cell);
+  const scale = Math.ceil(1/vp.zoom);
   const [X, Y] = [ix1 - ix0 + 1, iy1 - iy0 + 1];
 
   map.ctx.fillStyle = COLORS.map.bg;
@@ -2218,15 +2107,15 @@ function update_map (controls, life_api, map, _vp, ovw, env) {
     // console.log("Read region", ix0 + xb0, iy0, Xb, Y);
     if (scale === 1) {
       const region = life_api.read_region(ix0 + xb0, iy0, Xb, Y);
-      const gap = Math.floor(vp.cell/10);
+      const gap = Math.floor(vp.zoom/10);
 
       for (let y = 0; y < Y; y++)
         for (let x = 0; x < Xb; x++)
           if (1 === linear_memory[region + y * Xb + x]) {
-            const xs = (ix0 + xb0 + x - vp.x0) * vp.cell;
-            const ys = (iy0 + y - vp.y0) * vp.cell;
+            const xs = (ix0 + xb0 + x - vp.x0) * vp.zoom;
+            const ys = (iy0 + y - vp.y0) * vp.zoom;
             map.ctx.fillRect(xs * map.scale.x + gap/2, ys * map.scale.y + gap/2,
-                  vp.cell * map.scale.x - gap, vp.cell * map.scale.y - gap);
+                  vp.zoom * map.scale.x - gap, vp.zoom * map.scale.y - gap);
           }
     }
     else {
@@ -2235,9 +2124,9 @@ function update_map (controls, life_api, map, _vp, ovw, env) {
       for (let y = 0; y < Ys; y++)
         for (let x = 0; x < Xs; x++)
           if (linear_memory[region + y * Xs + x] > 0) {
-            const xs = (ix0 + xb0 + x * scale - vp.x0) * vp.cell;
-            const ys = (iy0 + y * scale - vp.y0) * vp.cell;
-            map.ctx.fillRect(xs * map.scale.x, ys * map.scale.y, vp.cell * map.scale.x * scale, vp.cell * map.scale.y * scale);
+            const xs = (ix0 + xb0 + x * scale - vp.x0) * vp.zoom;
+            const ys = (iy0 + y * scale - vp.y0) * vp.zoom;
+            map.ctx.fillRect(xs * map.scale.x, ys * map.scale.y, vp.zoom * map.scale.x * scale, vp.zoom * map.scale.y * scale);
           }
     }
   }
@@ -2246,7 +2135,7 @@ function update_map (controls, life_api, map, _vp, ovw, env) {
 module.exports = {
   init: init
 };
-},{"../external/wasm-printf":1,"./reset-dlg":14,"assert":2}],13:[function(require,module,exports){
+},{"../external/wasm-printf":1,"./canvas":12,"./panzoom":15,"./reset-dlg":16,"assert":2}],14:[function(require,module,exports){
 const display_init = require('./life-display').init;
 const {wasm_printf} = require('../external/wasm-printf');
 
@@ -2286,7 +2175,214 @@ function main () {
 }
 
 main ();
-},{"../external/wasm-printf":1,"./life-display":12}],14:[function(require,module,exports){
+},{"../external/wasm-printf":1,"./life-display":13}],15:[function(require,module,exports){
+const {Canvas} = require('./canvas');
+
+function PanZoom(domElm, canvas, redraw_fn) {
+  this.domElm = domElm;        // actual HTML DOM Canvas element
+  this.canvas = canvas;        // Canvas class
+  this.redraw_fn = redraw_fn;  // Callback to redraw canvas
+  
+  this.touches = [];           // mouse pointer(s) [id, x0, y0, x, y]
+  this.lastRedrawTime = 0;     // timestamp of last `redraw_fn` call
+}
+
+/*
+ * Two events below are triggered by mouse/trackpad.
+ * This is simple.
+ */
+PanZoom.prototype.scroll = function (k, dx, dy) {
+  // Mouse scroll
+  // dx, dy are mouse movements
+  // k is a speed up coefficient, usually 2
+  
+  // shift the base of the viewport accordingly
+  this.canvas.vewport.x0 += k * dx / this.canvas.vewport.zoom;
+  this.canvas.vewport.y0 += k * dy / this.canvas.vewport.zoom;
+
+  this._redraw();
+}
+
+PanZoom.prototype.zoom = function (k, x, y) {
+  // Mouse zoom
+  // k is zoom coefficient
+  // x,y is application point of zoom (:= point that shouldn't move)
+
+  // transform application point to internal coordinates
+  const d = {x: x / this.canvas.vewport.zoom, y: y / this.canvas.vewport.zoom};
+  const o = {x: this.canvas.vewport.x0 + d.x, y: this.canvas.vewport.y0 + d.y};
+
+  // update zoom
+  this.canvas.vewport.zoom *= k;
+
+  // recompute the base
+  this.canvas.vewport.x0 = o.x - d.x/k;
+  this.canvas.vewport.y0 = o.y - d.y/k;
+
+  this._redraw();
+}
+
+/*
+ * Now we have to deal with multi-touch pointer events...
+ * We manage these by adding a new property to Canvas
+ *   vp_temp : viewport which is only active during continuous pan/zoom
+ */
+PanZoom.prototype.down = function (id, x, y) {
+  // pointer down
+  // id is pointer id
+  // x, y are current coordinates of the pointer
+
+  // if this pointer is already down, something must be wrong, just return
+  const idx = this.touches.findIndex(t => t.id === id);
+  if (idx >= 0) return;
+
+  // if we already have two pointers down, ignore and return
+  if (this.touches.length >= 2)
+    return;
+
+  // if we already had one pointer down, update viewport
+  // (in other words, make it look like existing pointer was just pressed)
+  if (this.touches.length === 1) {
+    this.canvas.update_vp ();
+    const t = this.touches[0];
+    t.x0 = t.x;
+    t.y0 = t.y;
+  }
+
+  this.domElm.setPointerCapture(id);
+
+  // now add new pointer (1-st or 2-nd) and initialize `vp_temp`
+  this.touches.push({id: id, x0: x, y0: y, x: x, y : y});
+  this.canvas.vp_temp = {...this.canvas.vewport};
+}
+
+PanZoom.prototype.move = function (id, x, y) {
+  // pointer move
+  // id is pointer id
+  // x, y are current coordinates of the pointer
+
+  // if this pointer is not in the list (e.g. 3-rd finger was pressed and now it moves), ignore
+  const idx = this.touches.findIndex(x => x.id === id);
+  if (idx < 0) return;
+
+  // update current coordinates (`x0`, `y0` remain)
+  this.touches[idx].x = x;
+  this.touches[idx].y = y;
+
+  // update temporary viewport and trigger redraw
+  this._update_vp_temp(...this.touches);
+  this._redraw();
+}
+
+PanZoom.prototype.up = function (id) {
+  // pointer up
+  // id is pointer id
+  // x, y are current coordinates of the pointer
+
+  // if this pointer is not in the list (e.g. 3-rd finger was pressed and now released), ignore
+  const idx = this.touches.findIndex(x => x.id === id);
+  if (idx < 0) return;
+
+  // remove this pointer from the list and make temporary viewport current
+  this.touches.splice(idx, 1);
+  this.domElm.releasePointerCapture(id);
+  this.canvas.update_vp();
+
+  // if (at most one) pointer is still down, reset it similarly to method "down"
+  // (as if it was just pressed)
+  if (this.touches.length === 1) {
+    const t = this.touches[0];
+    t.x0 = t.x;
+    t.y0 = t.y;
+  }
+}
+
+/*
+ * Now we need to take care of actual logic
+ * how to update view based on a multi-touch gesture?
+ */
+PanZoom.prototype._update_vp_temp = function(a, b) {
+  // a,b : two pointers; b could be null
+  // each pointer has initial position x0, y0 and current position x,y
+
+  const oldZoom = this.canvas.vewport.zoom;
+  if (b) {
+    // two-pointer gesture: compute new zoom based on relative change in distance
+    const old_d = (a.x0 - b.x0)**2 + (a.y0 - b.y0)**2;
+    const new_d = (a.x - b.x)**2 + (a.y - b.y)**2;
+    const newZoom = oldZoom * new_d/old_d;
+
+    // This is now similar to method `zoom`, with middle point between `a` and `b` as new fixed point
+    const shift = {x: ((a.x + b.x)/newZoom - (a.x0 + b.x0)/oldZoom)/2, y: ((a.y + b.y)/newZoom - (a.y0 + b.y0)/oldZoom)/2};
+
+    this.canvas.vp_temp.zoom = newZoom;
+    this.canvas.vp_temp.x0 = this.canvas.vewport.x0 - shift.x;
+    this.canvas.vp_temp.y0 = this.canvas.vewport.y0 - shift.y;
+  }
+  else {
+    // only one pointer gesture, this isn't complicated
+    this.canvas.vp_temp.zoom = oldZoom;
+    this.canvas.vp_temp.x0 = this.canvas.vewport.x0 - (a.x - a.x0) / oldZoom;
+    this.canvas.vp_temp.y0 = this.canvas.vewport.y0 - (a.y - a.y0) / oldZoom;
+  }
+}
+
+/*
+ * Actual callback to `redraw_fn`
+ * We are using `requestAnimationFrame` to guarantee smooth repainting, and
+ * making sure there is at most one repaint per frame
+ */
+PanZoom.prototype._redraw = function () {
+  const frozen_vp = {...this.canvas.vp_temp};
+  window.requestAnimationFrame(ts => {
+    if (ts > this.lastRedrawTime) {
+      this.lastRedrawTime = ts;
+      this.redraw_fn(this.canvas, frozen_vp);
+    }
+  });
+}
+
+/*
+ * Simple add-on: show current zoom scale in an overlay canvas
+ * It will only show up when zoom changes and will disappear 1.5 seconds after it stopped updating
+ */
+
+function ZoomScaleOverlay(overlayCanvasElm) {
+  this.overlayCanvas = new Canvas(overlayCanvasElm, 2);
+  this.timeoutHandler = null;
+  this.lastZoom = null;
+}
+
+/*
+ * This method must be called on every zoom update
+ */
+ZoomScaleOverlay.prototype.update_zoom = function(zoom) {
+  if (this.lastZoom === zoom) return;
+  this.lastZoom = zoom;
+
+  const n = this.overlayCanvas.W/zoom;
+  const scaleAsString = n.toFixed(n >= 10? 0: n > 1? 1 : n > 0.1? 2 : 3);
+  const width = 5;
+
+  if (this.timeoutHandler) {
+    window.clearTimeout(this.timeoutHandler);
+    this.timeoutHandler = null;
+  }
+
+  this.overlayCanvas.clear();
+  this.overlayCanvas.ctx.fillStyle = '#808080';
+  this.overlayCanvas.ctx.font = "30px Arial";
+  this.overlayCanvas.showText(scaleAsString, this.overlayCanvas.W/2 - 5, 15)
+  this.overlayCanvas.fillRect(0, this.overlayCanvas.H - width, this.overlayCanvas.W, width);
+
+  this.timeoutHandler = window.setTimeout(() => this.overlayCanvas.clear(), 1500);
+}
+
+module.exports = {
+  PanZoom: PanZoom,
+  ZoomScaleOverlay: ZoomScaleOverlay
+};
+},{"./canvas":12}],16:[function(require,module,exports){
 let initialized = false;
 
 function rect (x, y, w, h, c) {
@@ -2364,4 +2460,4 @@ function show (selection_fn) {
 module.exports = {
   show: show
 };
-},{}]},{},[13]);
+},{}]},{},[14]);
