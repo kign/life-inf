@@ -2178,6 +2178,9 @@ main ();
 },{"../external/wasm-printf":1,"./life-display":13}],15:[function(require,module,exports){
 const {Canvas} = require('./canvas');
 
+/*
+ * class initialization from canvas
+ */
 function PanZoom(domElm, canvas, redraw_fn) {
   this.domElm = domElm;        // actual HTML DOM Canvas element
   this.canvas = canvas;        // Canvas class
@@ -2223,9 +2226,13 @@ PanZoom.prototype.zoom = function (k, x, y) {
 }
 
 /*
- * Now we have to deal with multi-touch pointer events...
+ * Now we have to deal with multi-touch pointer events ('down', 'move', 'up') ...
  * We manage these by adding a new property to Canvas
  *   vp_temp : viewport which is only active during continuous pan/zoom
+ * The goal is to avoid a pitfall to treat each and every 'move' event as separate;
+ * we want to analyze movement of pointers (fingers) from initial position to the current position
+ * However, any change of pointer configuration must trigger re-set of initial position
+ * (all initial positions must have come from the same time)
  */
 PanZoom.prototype.down = function (id, x, y) {
   // pointer down
@@ -2265,7 +2272,7 @@ PanZoom.prototype.move = function (id, x, y) {
   const idx = this.touches.findIndex(x => x.id === id);
   if (idx < 0) return;
 
-  // update current coordinates (`x0`, `y0` remain)
+  // update current coordinates (`x0`, `y0` remain!)
   this.touches[idx].x = x;
   this.touches[idx].y = y;
 
@@ -2312,7 +2319,7 @@ PanZoom.prototype._update_vp_temp = function(a, b) {
     const new_d = (a.x - b.x)**2 + (a.y - b.y)**2;
     const newZoom = oldZoom * new_d/old_d;
 
-    // This is now similar to method `zoom`, with middle point between `a` and `b` as new fixed point
+    // This now becomes similar to method `zoom`, with middle point between `a` and `b` as new fixed point
     const shift = {x: ((a.x + b.x)/newZoom - (a.x0 + b.x0)/oldZoom)/2, y: ((a.y + b.y)/newZoom - (a.y0 + b.y0)/oldZoom)/2};
 
     this.canvas.vp_temp.zoom = newZoom;
@@ -2320,7 +2327,7 @@ PanZoom.prototype._update_vp_temp = function(a, b) {
     this.canvas.vp_temp.y0 = this.canvas.vewport.y0 - shift.y;
   }
   else {
-    // only one pointer gesture, this isn't complicated
+    // only one pointer gesture, this is similar to `scroll` method above
     this.canvas.vp_temp.zoom = oldZoom;
     this.canvas.vp_temp.x0 = this.canvas.vewport.x0 - (a.x - a.x0) / oldZoom;
     this.canvas.vp_temp.y0 = this.canvas.vewport.y0 - (a.y - a.y0) / oldZoom;
@@ -2333,6 +2340,7 @@ PanZoom.prototype._update_vp_temp = function(a, b) {
  * making sure there is at most one repaint per frame
  */
 PanZoom.prototype._redraw = function () {
+  // redraw callback receives a frozen copy of temporary viewport, so it won't be impacted by further movements
   const frozen_vp = {...this.canvas.vp_temp};
   window.requestAnimationFrame(ts => {
     if (ts > this.lastRedrawTime) {
