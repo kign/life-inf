@@ -1,6 +1,6 @@
 #! /usr/bin/env python3
 import os.path, argparse, logging, random, re, math
-from time import time_ns
+from time import time, time_ns
 from inetlab.cli.colorterm import add_coloring_to_emit_ansi
 from wasm_import.sprintf import wasm_sprintf as sprintf, read_i32
 import conway_life as life_fin
@@ -49,8 +49,10 @@ def get_args () :
         logging.error("Invalid density value %f, must be between 0 and 1", args.density)
         exit(1)
 
-    if args.seed :
-        random.seed(args.seed)
+    if args.seed is None :
+        args.seed = int(time()**2*100) % 100000
+        logging.info("Reproduce same run with --seed %d", args.seed)
+    random.seed(args.seed)
 
     if not (0 < args.iterations < 1_000_000_000) :
         logging.error("Invalid number of iterations %d", args.iterations)
@@ -192,7 +194,12 @@ def main(args) :
         n_iter = 0
         t0 = time_ns ()
         for ii in range(args.iterations) :
-            life_inf.step()
+            kbd_interrupt = False
+            try :
+                life_inf.step()
+            except KeyboardInterrupt as err:
+                kbd_interrupt = True
+
             n_iter += 1
             if args.cmp_with_fin :
                 x_min, x_max, y_min, y_max = life_inf.find_envelope()
@@ -205,6 +212,11 @@ def main(args) :
                 if fx0 == 0 or fy0 == 0 or fx1 == Xf - 1 or fy1 == Yf - 1 :
                     do_2nd = False
                     break
+
+            if  kbd_interrupt :
+                logging.error("Interrupted after %d iterations", n_iter)
+                break
+
         perf_inf = (time_ns() - t0)/n_iter
 
         print("Envelope after", n_iter, "iterations", life_inf.find_envelope())
