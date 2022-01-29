@@ -4,6 +4,9 @@ c4wa-compile = $(HOME)/git/c4wa/build/install/c4wa-compile/bin/c4wa-compile
 # PP_OPTS = -DN=71 -DN0=100
 # Debug
 PP_OPTS = -DDEBUG=1 -DN=5 -DN0=6
+
+ALIGNMENT = 1
+
 browserify = ../node_modules/.bin/browserify
 light-server = ../node_modules/.bin/light-server
 port = 9811
@@ -19,7 +22,7 @@ build : $(wasm_bundle) $(js_bundle)
 
 $(wasm_bundle) : $(c_sources) $(h_sources) Makefile
 	gcc -Wall -Wextra -Werror $(PP_OPTS) $(c_sources) -o /dev/null
-	$(c4wa-compile) $(PP_OPTS) $(c_sources) -lmm_fixed -lstring -o /tmp/bundle.wat
+	$(c4wa-compile) -a $(ALIGNMENT) $(PP_OPTS) $(c_sources) -lmm_fixed -lstring -o /tmp/bundle.wat
 	wat2wasm /tmp/bundle.wat -o $@
 
 $(js_bundle): $(js_sources) Makefile
@@ -34,5 +37,5 @@ start: build
 run: start
 
 cmp: $(wasm_bundle)
-	$(c4wa-compile) $(PP_OPTS) $(c_sources) -lmm_fixed -lstring -o /tmp/bundle.wasm
+	$(c4wa-compile) -a $(ALIGNMENT) $(PP_OPTS) $(c_sources) -lmm_fixed -lstring -o /tmp/bundle.wasm
 	diff /tmp/bundle.wasm $(wasm_bundle)
